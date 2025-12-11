@@ -1,7 +1,7 @@
 # spack-helpers
 
-[![pytest](https://github.com/NOAA-EMC/spack-helpers/actions/workflows/test.yml/badge.svg)](https://github.com/NOAA-EMC/spack-helpers/actions/workflows/pytest.yml)
-[![Test custom action](https://github.com/NOAA-EMC/spack-helpers/actions/workflows/test-action.yml/badge.svg)](https://github.com/NOAA-EMC/spack-helpers/actions/workflows/test-custom-action.yml)
+[![pytest](https://github.com/NOAA-EMC/spack-helpers/actions/workflows/pytest.yml/badge.svg)](https://github.com/NOAA-EMC/spack-helpers/actions/workflows/pytest.yml)
+[![Test custom action](https://github.com/NOAA-EMC/spack-helpers/actions/workflows/test-custom-action.yml/badge.svg)](https://github.com/NOAA-EMC/spack-helpers/actions/workflows/test-custom-action.yml)
 
 This Spack extension provides useful commands for modifying and validating and filter Spack environments.
 
