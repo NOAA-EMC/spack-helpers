@@ -1,4 +1,4 @@
-name: Test Action
+name: "CI: Test custom action (action.yml)"
 
 on: [push, pull_request]
 
