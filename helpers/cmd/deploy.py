@@ -33,6 +33,7 @@ from spack.extensions.helpers.check_buildable import check_buildable_configurati
 from spack.extensions.helpers.check_allowed_compilers import check_allowed_compilers
 from spack.extensions.helpers.fetch_cargo import fetch_cargo_dependencies
 from spack.extensions.helpers.fetch_go import fetch_go_dependencies
+from spack.extensions.helpers.allow_only_approved_packages import allow_only_approved_packages
 
 description = "deploy spack-stack environments based on configuration"
 section = "environments"
@@ -287,6 +288,14 @@ def deploy(parser, args):
                     env.remove(root_spec)
             env.write()
 
+        # Configure buildability if approved packages list exists or site is wcoss2
+        approved_list_path = os.path.join(env_dir_full_path, "site", "approved_packages.txt")
+        if os.path.exists(approved_list_path) or stack_settings["site"] == "wcoss2":
+            tty.msg("... configuring buildability for approved packages ...")
+            approved_packages = read_approved_packages_from_file(approved_list_path)
+            configured_count = allow_only_approved_packages(env, approved_packages)
+            tty.msg(f"Configured {configured_count} approved package(s) as buildable.")
+
         if args.until == "create":
             ev.deactivate()
             logfile.close()
@@ -340,7 +349,7 @@ def deploy(parser, args):
 
         # Check for approved packages if approved_packages.txt exists
         approved_list_path = os.path.join(env_dir_full_path, "site", "approved_packages.txt")
-        if os.path.exists(approved_list_path):
+        if os.path.exists(approved_list_path) or deployment["site"] == "wcoss2":
             tty.msg("... checking approved packages ...")
             approved_packages = read_approved_packages_from_file(approved_list_path)
             unauthorized_specs = check_approved_packages(env, approved_packages)

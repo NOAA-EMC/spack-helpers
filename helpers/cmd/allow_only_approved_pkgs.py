@@ -9,6 +9,10 @@ import spack.llnl.util.tty as tty
 import spack.cmd
 import spack.environment as ev
 from spack.error import SpackError
+from spack.extensions.helpers.allow_only_approved_packages import (
+    allow_only_approved_packages,
+    read_approved_packages_from_file
+)
 
 description = "configure environment to set only approved packages as buildable"
 section = "environments"
@@ -48,46 +52,15 @@ def allow_only_approved_pkgs(parser, args):
     
     # Get approved packages from command line or file
     if args.pkgs_from_file:
-        try:
-            with open(args.pkgs_from_file, 'r') as f:
-                approved_packages = [
-                    line.strip() for line in f 
-                    if line.strip() and not line.strip().startswith('#')
-                ]
-        except IOError as e:
-            raise SpackError(f"Could not read package list from {args.pkgs_from_file}: {e}")
+        approved_packages = read_approved_packages_from_file(args.pkgs_from_file)
     else:
         approved_packages = args.packages if args.packages else []
     
     if not approved_packages:
         raise SpackError("No packages specified. Provide package names or use --pkgs-from-file.")
     
-    # Get packages config from environment
-    if 'packages' not in env.manifest.configuration:
-        env.manifest.configuration['packages'] = {}
-    
-    packages = env.manifest.configuration['packages']
-    
-    # Process approved packages
-    for pkg_name in approved_packages:
-        if pkg_name not in packages:
-            packages[pkg_name] = {}
-        
-        # Check if already marked as buildable: false
-        if packages[pkg_name].get('buildable') is False:
-            tty.msg(f"Package '{pkg_name}' is already buildable:false, skipping.")
-        else:
-            packages[pkg_name]['buildable'] = True
-            tty.debug(f"Set '{pkg_name}' buildable:true")
-    
-    # Set packages:all:buildable:false
-    if 'all' not in packages:
-        packages['all'] = {}
-    packages['all']['buildable'] = False
-    
-    # Mark as changed and write
-    env.manifest.changed = True
-    env.write()
+    # Configure buildability
+    configured_count = allow_only_approved_packages(env, approved_packages)
     
     tty.msg(f"Configured {len(approved_packages)} approved package(s) as buildable.")
     tty.msg("Set 'all' packages as non-buildable (buildable:false).")
