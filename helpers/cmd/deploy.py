@@ -74,6 +74,11 @@ def setup_parser(subparser):
         nargs='*',
         help="List of deployments to apply (default is all; specify template+compiler with, e.g., 'unified-dev%%oneapi@2024.2.1')"
     )
+    subparser.add_argument(
+        '-l', '--list-only',
+        action='store_true',
+        help="List configured deployments for the detected site and exit"
+    )
 
 
 def get_site_and_tier(deployment={}, args=None):
@@ -231,14 +236,17 @@ def deploy(parser, args):
                 deployment["only_concretize_requested_packages"] = False
             env_dir_basename = get_env_dir_basename(deployment)
             deployments[env_dir_basename] = deployment
-            tty.msg(f"  Registered deployment: {deployment['template']}/{deployment['compiler']} ({env_dir_basename})")
+            tty.msg(f"  Registered deployment: {deployment['template']}%{deployment['compiler']} ({env_dir_basename})")
+
+    if args.list_only:
+        sys.exit(0)
 
     tty.msg("=" * 30)
 
     # Create and install each deployment
     for env_dir_basename, deployment in deployments.items():
         if not is_deployment_requested(env_dir_basename, deployment, args, spack_stack_dir):
-            tty.msg(f"Skipping deployment: {deployment['template']}/{deployment['compiler']} ({env_dir_basename})")
+            tty.msg(f"Skipping deployment: {deployment['template']}%{deployment['compiler']} ({env_dir_basename})")
             continue
         
         tty.msg("=" * 30)
