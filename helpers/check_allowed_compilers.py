@@ -9,11 +9,51 @@ from typing import List
 import spack.spec
 
 
+def _expand_compiler_synonyms(compiler_specs):
+    """Expand compiler name synonyms to their full package names.
+    
+    Supports:
+    - 'oneapi' -> 'intel-oneapi-compilers'
+    - 'intel' -> 'intel-oneapi-compilers-classic'
+    
+    Args:
+        compiler_specs: List of compiler spec strings
+        
+    Returns:
+        List of compiler spec strings with synonyms expanded
+    """
+    synonyms = {
+        'oneapi': 'intel-oneapi-compilers',
+        'intel': 'intel-oneapi-compilers-classic'
+    }
+    
+    expanded_specs = []
+    for spec_str in compiler_specs:
+        # Parse to extract compiler name
+        spec = spack.spec.Spec(spec_str)
+        base_name = spec.name
+        
+        # Replace if it's a synonym
+        if base_name in synonyms:
+            # Reconstruct spec string with full name
+            full_name = synonyms[base_name]
+            expanded_str = spec_str.replace(base_name, full_name, 1)
+            expanded_specs.append(expanded_str)
+        else:
+            expanded_specs.append(spec_str)
+    
+    return expanded_specs
+
+
 def check_allowed_compilers(env, allowed_compilers):
     """Check for specs using compilers not in the allowed list.
     
     Iterates over all concretized specs in the environment and identifies
     specs that use compilers (c, c++, fortran) not in the allowed list.
+    
+    Supports compiler name synonyms:
+    - 'oneapi' -> 'intel-oneapi-compilers'
+    - 'intel' -> 'intel-oneapi-compilers-classic'
     
     Args:
         env: A Spack Environment object to check
@@ -26,8 +66,11 @@ def check_allowed_compilers(env, allowed_compilers):
     
     illegal_specs = []
     
+    # Expand synonyms
+    expanded_compilers = _expand_compiler_synonyms(allowed_compilers)
+    
     # Parse allowed compiler specs
-    allowed_compiler_specs = [spack.spec.Spec(spec_str) for spec_str in allowed_compilers]
+    allowed_compiler_specs = [spack.spec.Spec(spec_str) for spec_str in expanded_compilers]
     
     # Iterate over all concretized specs in the environment
     for user_spec, concrete_spec in env.concretized_specs():

@@ -7,7 +7,7 @@ import spack.extensions
 
 # Load the helpers extension
 spack.extensions.load_extension("helpers")
-from spack.extensions.helpers.filter_compiler_packages import filter_compiler_packages
+from spack.extensions.helpers.filter_compiler_packages import filter_compiler_packages, _expand_compiler_synonyms
 
 
 @pytest.fixture
@@ -139,3 +139,15 @@ def test_filter_compilers_remove(filter_compilers_env):
     
     # clang non-externals configuration should be preserved
     assert clang_config.get('buildable') is False, "clang buildable should be preserved"
+
+
+def test_expand_compiler_synonyms():
+    """Test that compiler synonyms are correctly expanded."""
+
+    # Test both synonyms together
+    result = _expand_compiler_synonyms(['oneapi@2024.2.1', 'intel@2021.4.0', 'gcc@11.2.0'])
+    assert result == ['intel-oneapi-compilers@2024.2.1', 'intel-oneapi-compilers-classic@2021.4.0', 'gcc@11.2.0']
+    
+    # Test non-synonym (should be unchanged)
+    result = _expand_compiler_synonyms(['gcc@11.2.0', 'clang@14.0.0'])
+    assert result == ['gcc@11.2.0', 'clang@14.0.0']

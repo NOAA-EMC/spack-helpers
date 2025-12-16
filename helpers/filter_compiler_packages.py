@@ -9,11 +9,51 @@ import spack.config
 from spack.llnl.util import tty
 
 
+def _expand_compiler_synonyms(compiler_specs):
+    """Expand compiler name synonyms to their full package names.
+    
+    Supports:
+    - 'oneapi' -> 'intel-oneapi-compilers'
+    - 'intel' -> 'intel-oneapi-compilers-classic'
+    
+    Args:
+        compiler_specs: List of compiler spec strings
+        
+    Returns:
+        List of compiler spec strings with synonyms expanded
+    """
+    synonyms = {
+        'oneapi': 'intel-oneapi-compilers',
+        'intel': 'intel-oneapi-compilers-classic'
+    }
+    
+    expanded_specs = []
+    for spec_str in compiler_specs:
+        # Parse to extract compiler name
+        spec = spack.spec.Spec(spec_str)
+        base_name = spec.name
+        
+        # Replace if it's a synonym
+        if base_name in synonyms:
+            # Reconstruct spec string with full name
+            full_name = synonyms[base_name]
+            expanded_str = spec_str.replace(base_name, full_name, 1)
+            expanded_specs.append(expanded_str)
+        else:
+            expanded_specs.append(spec_str)
+    
+    return expanded_specs
+
+
 def filter_compiler_packages(env, compiler_specs, mode='remove'):
     """Filter compiler packages in packages configuration using :: syntax.
     
     This function filters compiler packages by creating environment-level package
     configuration entries using the '::' syntax to override upstream configs.
+    
+    Supports compiler name synonyms:
+    - 'oneapi' -> 'intel-oneapi-compilers'
+    - 'intel' -> 'intel-oneapi-compilers-classic'
     
     Args:
         compiler_specs: List of compiler spec strings (e.g., ['gcc@11.2.0', 'clang@14'])
@@ -24,8 +64,11 @@ def filter_compiler_packages(env, compiler_specs, mode='remove'):
     Returns:
         tuple: modified_count - number of compilers modified
     """
+    # Expand synonyms
+    expanded_specs = _expand_compiler_synonyms(compiler_specs)
+    
     # Parse compiler specs
-    parsed_specs = [spack.spec.Spec(spec_str) for spec_str in compiler_specs]
+    parsed_specs = [spack.spec.Spec(spec_str) for spec_str in expanded_specs]
     
     # Common compiler package names
     compiler_packages = {
