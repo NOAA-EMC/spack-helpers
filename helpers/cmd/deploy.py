@@ -99,7 +99,8 @@ def get_env_dir_basename(deployment):
     base = deployment["template"]
     base = base.replace("unified-dev", "ue")
     base = base.replace("-dev", "")
-    return "-".join([base, deployment["compiler"]])
+    # Convert compiler spec to hyphenated format for directory name
+    return "-".join([base, deployment["compiler"].replace('@', '-', 1)])
 
 
 def deployment_already_exists(env_dir_basename, spack_stack_dir):
@@ -141,6 +142,8 @@ def get_create_env_settings(env_dir_basename, deployment, deployments, spack_sta
                     break
         config_dict["upstreams"] = upstream_full_paths
     config_dict["compiler"] = deployment["compiler"]
+    # Also provide hyphenated compiler format for stack create command
+    config_dict["compiler_hyphenated"] = deployment["compiler"].replace('@', '-', 1)
 
     return config_dict
 
@@ -262,7 +265,8 @@ def deploy(parser, args):
             tty.msg(f"Moving {env_dir_full_path}\n  to {backup_dir_full_path}")
             os.rename(env_dir_full_path, backup_dir_full_path)
         
-        logfilepath = os.path.join(logdir, nowdate + f".{deployment['template']}.{deployment['compiler']}.log")
+        # Use hyphenated compiler format in log file name
+        logfilepath = os.path.join(logdir, nowdate + f".{deployment['template']}.{deployment['compiler_hyphenated']}.log")
         tty.msg(f"Log file: {logfilepath}")
         logfile = open(logfilepath, "a", buffering=1)
         logfile.write(str(deployment) + "\n")
