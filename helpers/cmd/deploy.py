@@ -33,7 +33,6 @@ from spack.extensions.helpers.check_buildable import check_buildable_configurati
 from spack.extensions.helpers.check_allowed_compilers import check_allowed_compilers
 from spack.extensions.helpers.fetch_cargo import fetch_cargo_dependencies
 from spack.extensions.helpers.fetch_go import fetch_go_dependencies
-from spack.extensions.helpers.filter_compiler_packages import filter_compiler_packages
 
 description = "deploy spack-stack environments based on configuration"
 section = "environments"
@@ -141,8 +140,7 @@ def get_create_env_settings(env_dir_basename, deployment, deployments, spack_sta
                     upstream_full_paths.append([upstream_full_path])
                     break
         config_dict["upstreams"] = upstream_full_paths
-    config_dict["compiler"] = deployment["compiler"]
-    config_dict["compiler_hyphenated"] = deployment["compiler_hyphenated"]
+    config_dict["compiler"] = deployment["compiler_hyphenated"]
 
     return config_dict
 
@@ -281,13 +279,6 @@ def deploy(parser, args):
         stack_env.check_umask()
         env = ev.Environment(env_dir_full_path)
         ev.activate(env)
-
-        # Filter compilers - keep only deployment compiler and gcc
-        compilers_to_keep = [deployment["compiler"], "gcc"]
-        tty.msg(f"... filtering compilers (keeping: {', '.join(compilers_to_keep)}) ...")
-        modified_count = filter_compiler_packages(env, compilers_to_keep, mode='keep-only')
-        if modified_count > 0:
-            tty.msg(f"  Filtered {modified_count} compiler package(s)")
 
         # Filter out unwanted packages before concretization
         if deployment["only_concretize_requested_packages"]:
