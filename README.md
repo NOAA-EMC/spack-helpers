@@ -83,6 +83,14 @@ spack validate compilers intel-oneapi-compilers gcc
 will return an error if any packages have `c`/`cxx`/`fortran` providers that are not `intel-oneapi-compilers` or `gcc`.
 
 
+## spack-stack deployment
+To run a deploy based on a deployments.yaml for a given spack-stack directory and site, run
+```console
+spack deploy
+```
+Compared with the deploy.py utility in spack-stack, this will implement more robust checks. This copy and not the spack-stack one should be used for WCOSS2 installations.
+
+
 ## Python API
 To access the extensions via Spack Python API (`spack-python` etc.), do, e.g.:
 ```python
