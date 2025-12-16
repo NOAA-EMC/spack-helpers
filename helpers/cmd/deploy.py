@@ -379,7 +379,7 @@ def deploy(parser, args):
 
         # Install packages
         if deployment["packages_to_install"]:
-            tty.msg(" ... installing specs: " + " ".join(deployment["packages_to_install"]) + "...")
+            tty.msg("... installing specs: " + " ".join(deployment["packages_to_install"]) + "...")
         else:
             tty.msg("... installing ...")
         
