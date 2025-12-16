@@ -378,10 +378,10 @@ def deploy(parser, args):
             continue
 
         # Install packages
-        tty.msg("... installing", newline=False)
         if deployment["packages_to_install"]:
-            tty.msg(" specs: " + " ".join(deployment["packages_to_install"]), newline=False)
-        tty.msg(" ...")
+            tty.msg(" ... installing specs: " + " ".join(deployment["packages_to_install"]) + "...")
+        else:
+            tty.msg("... installing ...")
         
         if args.no_scheduler:
             specs = env.all_matching_specs(*(" ".join(deployment["packages_to_install"])))
