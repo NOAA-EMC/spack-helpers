@@ -294,7 +294,6 @@ def deploy(parser, args):
             tty.msg("... configuring buildability for approved packages ...")
             approved_packages = read_approved_packages_from_file(approved_list_path)
             configured_count = allow_only_approved_packages(env, approved_packages)
-            tty.msg(f"Configured {configured_count} approved package(s) as buildable.")
 
         if args.until == "create":
             ev.deactivate()
