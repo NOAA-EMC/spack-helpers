@@ -24,6 +24,16 @@ import spack.cmd
 import spack.environment as ev
 from spack.error import SpackError
 from spack.extensions.helpers.check_duplicates import check_duplicate_packages
+from spack.extensions.helpers.check_compiler_usage import check_compiler_usage
+from spack.extensions.helpers.check_approved_packages import (
+    check_approved_packages,
+    read_approved_packages_from_file
+)
+from spack.extensions.helpers.check_buildable import check_buildable_configuration
+from spack.extensions.helpers.check_allowed_compilers import check_allowed_compilers
+from spack.extensions.helpers.fetch_cargo import fetch_cargo_dependencies
+from spack.extensions.helpers.fetch_go import fetch_go_dependencies
+from spack.extensions.helpers.filter_compiler_packages import filter_compiler_packages
 
 description = "deploy spack-stack environments based on configuration"
 section = "environments"
@@ -260,6 +270,13 @@ def deploy(parser, args):
         env = ev.Environment(env_dir_full_path)
         ev.activate(env)
 
+        # Filter compilers - keep only deployment compiler and gcc
+        compilers_to_keep = [deployment["compiler"], "gcc"]
+        tty.msg(f"... filtering compilers (keeping: {', '.join(compilers_to_keep)}) ...")
+        modified_count = filter_compiler_packages(env, compilers_to_keep, mode='keep-only')
+        if modified_count > 0:
+            tty.msg(f"  Filtered {modified_count} compiler package(s)")
+
         # Filter out unwanted packages before concretization
         if deployment["only_concretize_requested_packages"]:
             for root_spec in env.roots():
@@ -298,18 +315,47 @@ def deploy(parser, args):
                     tty.error(f"    - {spec.dag_hash(length=7)} {spec}")
             raise SpackError("Duplicates found! Review the errors above.")
 
-        # Fail if there packages that shouldn't be built with GCC are built with GCC:
-        all_compilers = set()
-        for spec in env.all_specs():
-            for language in ("c", "cxx", "fortran"):
-                if language not in spec:
-                    continue
-                compiler_name = spec[language].name
-                all_compilers.add(compiler_name)
-                if "allowed_gcc_packages" in deployment:
-                    is_legal = not (compiler_name == "gcc" and spec.name not in deployment["allowed_gcc_packages"])
-                    if not is_legal:
-                        raise SpackError(f"spec '{spec.name}/{spec.dag_hash()}' to be built with GCC but not in 'allowed_gcc_packages'!")
+        # Check that only allowed compilers are used
+        allowed_compiler_spec = deployment["compiler"]
+        illegal_compiler_specs = check_allowed_compilers(env, [allowed_compiler_spec, "gcc"])
+        if illegal_compiler_specs:
+            tty.error(f"Packages using disallowed compilers (allowed: {allowed_compiler_spec}):")
+            for spec in illegal_compiler_specs:
+                tty.error(f"  - {spec.name}/{spec.dag_hash(length=7)} (compiler: {spec.compiler})")
+            raise SpackError("Disallowed compilers found! Review the errors above.")
+
+        # Check for packages that shouldn't be built with GCC
+        if "allowed_gcc_packages" in deployment:
+            illegal_gcc_specs = check_compiler_usage(
+                env, "gcc", deployment["allowed_gcc_packages"]
+            )
+            if illegal_gcc_specs:
+                tty.error("Packages built with GCC that are not in allowed_gcc_packages:")
+                for spec in illegal_gcc_specs:
+                    tty.error(f"  - {spec.name}/{spec.dag_hash(length=7)}")
+                raise SpackError("Illegal GCC usage found! Review the errors above.")
+
+        # Check for approved packages if approved_list.txt exists
+        approved_list_path = os.path.join(env_dir_full_path, "approved_list.txt")
+        if os.path.exists(approved_list_path):
+            tty.msg("... checking approved packages ...")
+            approved_packages = read_approved_packages_from_file(approved_list_path)
+            unauthorized_specs = check_approved_packages(env, approved_packages)
+            if unauthorized_specs:
+                tty.error("Unauthorized packages found in environment:")
+                for spec in unauthorized_specs:
+                    tty.error(f"  - {spec.name}/{spec.dag_hash(length=7)}")
+                raise SpackError("Unauthorized packages found! Review the errors above.")
+            else:
+                tty.msg(f"All packages validated against approved list ({len(approved_packages)} approved packages).")
+
+        # Check buildable configuration
+        buildability_violations = check_buildable_configuration(env)
+        if buildability_violations:
+            tty.error("Packages marked unbuildable but being built:")
+            for spec in buildability_violations:
+                tty.error(f"  - {spec.name}/{spec.dag_hash(length=7)}")
+            raise SpackError("Buildability configuration violations found! Review the errors above.")
 
         if args.until == "validate":
             ev.deactivate()
@@ -340,25 +386,21 @@ def deploy(parser, args):
         else:
             logfile.write("Starting install jobs via job scheduler...\n")
             if not args.skip_go_rust_handling:
+                # Install rust and go packages first
                 run_batch_install(deployments_yaml["batch_config"], deployment, env_dir_full_path, logfile, logfilepath, packages_to_install=["rust", "go"], suffix=".rustgo")
-                shell_env = os.environ.copy()
-                shell_env["SPACK_ENV"] = env_dir_full_path
-                subprocess.run(
-                    os.path.join(spack_stack_dir, "util", "fetch_cargo_deps.py"),
-                    env=shell_env,
-                    stdout=logfile,
-                    stderr=logfile,
-                    check=True,
-                    text=True,
-                )
-                subprocess.run(
-                    os.path.join(spack_stack_dir, "util", "fetch_go_deps.py"),
-                    env=shell_env,
-                    stdout=logfile,
-                    stderr=logfile,
-                    check=True,
-                    text=True,
-                )
+                
+                # Fetch Rust/Cargo dependencies
+                rust_specs = [s for s in env.all_specs() if "rust" in s]
+                if rust_specs:
+                    tty.msg("... fetching Rust/Cargo dependencies ...")
+                    fetch_cargo_dependencies(rust_specs, use_spack_rust=True)
+                
+                # Fetch Go dependencies
+                go_specs = [s for s in env.all_specs() if "go" in s]
+                if go_specs:
+                    tty.msg("... fetching Go module dependencies ...")
+                    fetch_go_dependencies(go_specs, use_spack_go=True)
+            
             run_batch_install(deployments_yaml["batch_config"], deployment, env_dir_full_path, logfile, logfilepath, packages_to_install=deployment["packages_to_install"])
 
         if args.until == "install":
@@ -368,6 +410,14 @@ def deploy(parser, args):
 
         # Generate modules
         tty.msg(f"... writing package modules ...")
+        
+        # Collect all compilers used in the environment for module configuration
+        all_compilers = set()
+        for spec in env.all_specs():
+            for language in ("c", "cxx", "fortran"):
+                if language in spec:
+                    all_compilers.add(spec[language].name)
+        
         subprocess.run(
             ["spack", "--env", env_dir_full_path, "module", "lmod", "refresh", "--yes-to-all", "--upstream-modules"],
             stdout=logfile,

@@ -14,7 +14,10 @@ from spack.error import SpackError
 from spack.extensions.helpers.check_duplicates import check_duplicate_packages
 from spack.extensions.helpers.check_compiler_usage import check_compiler_usage
 from spack.extensions.helpers.check_allowed_compilers import check_allowed_compilers
-from spack.extensions.helpers.check_approved_packages import check_approved_packages
+from spack.extensions.helpers.check_approved_packages import (
+    check_approved_packages,
+    read_approved_packages_from_file
+)
 from spack.extensions.helpers.check_buildable import check_buildable_configuration
 
 description = "validate Spack environments"
@@ -210,14 +213,7 @@ def validate(parser, args):
     
     elif args.validate_command == 'check-approved-pkgs':
         if args.pkgs_from_file:
-            try:
-                with open(args.pkgs_from_file, 'r') as f:
-                    approved_packages = [
-                        line.strip() for line in f 
-                        if line.strip() and not line.strip().startswith('#')
-                    ]
-            except IOError as e:
-                raise SpackError(f"Could not read package list from {args.pkgs_from_file}: {e}")
+            approved_packages = read_approved_packages_from_file(args.pkgs_from_file)
         else:
             approved_packages = args.packages
         

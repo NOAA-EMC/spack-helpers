@@ -8,6 +8,30 @@ from typing import List
 
 import spack.spec
 from spack.llnl.util import tty
+from spack.error import SpackError
+
+
+def read_approved_packages_from_file(filepath):
+    """Read approved package names from a file.
+    
+    Args:
+        filepath: Path to the file containing approved package names
+        
+    Returns:
+        List[str]: List of approved package names
+        
+    Raises:
+        SpackError: If the file cannot be read
+    """
+    try:
+        with open(filepath, 'r') as f:
+            approved_packages = [
+                line.strip() for line in f
+                if line.strip() and not line.strip().startswith('#')
+            ]
+        return approved_packages
+    except IOError as e:
+        raise SpackError(f"Could not read package list from {filepath}: {e}")
 
 
 def check_approved_packages(env, approved_packages):
