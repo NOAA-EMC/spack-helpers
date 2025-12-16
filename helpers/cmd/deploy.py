@@ -338,8 +338,8 @@ def deploy(parser, args):
                     tty.error(f"  - {spec.name}/{spec.dag_hash(length=7)}")
                 raise SpackError("Illegal GCC usage found! Review the errors above.")
 
-        # Check for approved packages if approved_list.txt exists
-        approved_list_path = os.path.join(env_dir_full_path, "approved_list.txt")
+        # Check for approved packages if approved_packages.txt exists
+        approved_list_path = os.path.join(env_dir_full_path, "site", "approved_packages.txt")
         if os.path.exists(approved_list_path):
             tty.msg("... checking approved packages ...")
             approved_packages = read_approved_packages_from_file(approved_list_path)
