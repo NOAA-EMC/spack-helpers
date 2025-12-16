@@ -142,8 +142,7 @@ def get_create_env_settings(env_dir_basename, deployment, deployments, spack_sta
                     break
         config_dict["upstreams"] = upstream_full_paths
     config_dict["compiler"] = deployment["compiler"]
-    # Also provide hyphenated compiler format for stack create command
-    config_dict["compiler_hyphenated"] = deployment["compiler"].replace('@', '-', 1)
+    config_dict["compiler_hyphenated"] = deployment["compiler_hyphenated"]
 
     return config_dict
 
@@ -233,6 +232,7 @@ def deploy(parser, args):
             deployment = _deployment.copy()
             del(deployment["compilers"])
             deployment["compiler"] = _compiler
+            deployment["compiler_hyphenated"] = _compiler.replace('@', '-', 1)
             if "packages_to_install" not in deployment:
                 deployment["packages_to_install"] = []
             if "only_concretize_requested_packages" not in deployment:
