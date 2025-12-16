@@ -393,13 +393,13 @@ def deploy(parser, args):
                 run_batch_install(deployments_yaml["batch_config"], deployment, env_dir_full_path, logfile, logfilepath, packages_to_install=["rust", "go"], suffix=".rustgo")
                 
                 # Fetch Rust/Cargo dependencies
-                rust_specs = [s for s in env.all_specs() if "rust" in s]
+                rust_specs = [s for s in env.all_specs() if "rust" in s and s.name != "rust"]
                 if rust_specs:
                     tty.msg("... fetching Rust/Cargo dependencies ...")
                     fetch_cargo_dependencies(rust_specs, use_spack_rust=True)
                 
                 # Fetch Go dependencies
-                go_specs = [s for s in env.all_specs() if "go" in s]
+                go_specs = [s for s in env.all_specs() if "go" in s and s.name != "go"]
                 if go_specs:
                     tty.msg("... fetching Go module dependencies ...")
                     fetch_go_dependencies(go_specs, use_spack_go=True)
