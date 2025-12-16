@@ -349,7 +349,6 @@ def deploy(parser, args):
         # Check for approved packages if approved_packages.txt exists
         approved_list_path = os.path.join(env_dir_full_path, "site", "approved_packages.txt")
         if os.path.exists(approved_list_path) or deployment["site"] == "wcoss2":
-            tty.msg("... checking approved packages ...")
             approved_packages = read_approved_packages_from_file(approved_list_path)
             unauthorized_specs = check_approved_packages(env, approved_packages)
             if unauthorized_specs:
@@ -357,8 +356,6 @@ def deploy(parser, args):
                 for spec in unauthorized_specs:
                     tty.error(f"  - {spec.name}/{spec.dag_hash(length=7)}")
                 raise SpackError("Unauthorized packages found! Review the errors above.")
-            else:
-                tty.msg(f"All packages validated against approved list ({len(approved_packages)} approved packages).")
 
         # Check buildable configuration
         buildability_violations = check_buildable_configuration(env)
