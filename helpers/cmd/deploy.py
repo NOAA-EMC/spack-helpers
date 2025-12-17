@@ -127,7 +127,7 @@ def is_deployment_requested(env_dir_basename, deployment, args, spack_stack_dir)
 def get_create_env_settings(env_dir_basename, deployment, deployments, spack_stack_dir):
     """Generate environment creation settings."""
     config_dict = {}
-    config_dict["site"] = get_site_and_tier(deployment=deployment)[0]
+    config_dict["site"] = deployment["site"]
     config_dict["template"] = deployment["template"]
     config_dict["dir"] = os.path.join(spack_stack_dir, "envs")
     config_dict["name"] = env_dir_basename
@@ -238,7 +238,8 @@ def deploy(parser, args):
                 deployment["only_concretize_requested_packages"] = False
             env_dir_basename = get_env_dir_basename(deployment)
             deployments[env_dir_basename] = deployment
-            tty.msg(f"  Registered deployment: {deployment['template']}%{deployment['compiler']} ({env_dir_basename})")
+            deployment["site"] = get_site_and_tier(deployment=_deployment)[0]
+            tty.msg(f"  Registered deployment: {deployment['template']}%{deployment['compiler']} ({env_dir_basename}, using '{deployment['site']}' site config)")
 
     if args.list_only:
         sys.exit(0)
@@ -290,7 +291,7 @@ def deploy(parser, args):
 
         # Configure buildability if approved packages list exists or site is wcoss2
         approved_list_path = os.path.join(env_dir_full_path, "site", "approved_packages.txt")
-        if os.path.exists(approved_list_path) or stack_settings["site"] == "wcoss2":
+        if os.path.exists(approved_list_path) or deployment["site"] == "wcoss2":
             tty.msg("... configuring buildability for approved packages ...")
             approved_packages = read_approved_packages_from_file(approved_list_path)
             configured_count = allow_only_approved_packages(env, approved_packages)
