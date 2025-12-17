@@ -31,7 +31,7 @@ def fetch_go_dependencies(specs: List["spack.spec.Spec"], use_spack_go: bool = F
         SpackError: If any fetch operation fails
     """
 
-    if os.getenv("GOMODCACHE"):
+    if not os.getenv("GOMODCACHE"):
         tty.warn("GOMODCACHE is not set. Go dependents will be cached to their default location.")
     
     for spec in specs:
