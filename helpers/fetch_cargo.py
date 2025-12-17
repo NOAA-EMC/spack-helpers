@@ -33,7 +33,7 @@ def fetch_cargo_dependencies(
     
     """
 
-    if os.getenv("CARGO_HOME"):
+    if not os.getenv("CARGO_HOME"):
         tty.warn("CARGO_HOME is not set. Rust/Cargo dependents will be cached to their default location.")
 
     for spec in specs:
