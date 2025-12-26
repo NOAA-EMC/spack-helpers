@@ -21,7 +21,7 @@ runs:
         ref: ${{ inputs.spack-ref }}
     
     - name: Configure extension
-      shell: bash
+      shell: spack-bash {0}
       run: |
         if [ -z $SPACK_ROOT ]; then
           export SPACK_ROOT=$(spack location --spack-root)
