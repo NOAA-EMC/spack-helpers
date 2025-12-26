@@ -27,4 +27,5 @@ runs:
           export SPACK_ROOT=$(spack location --spack-root)
           echo "SPACK_ROOT=$SPACK_ROOT" >> $GITHUB_ENV
         fi
-        . ${{ github.action_path }}/source_me.sh
+        cd && mv ${{ github.action_path }} /tmp/spack-helpers
+        . /tmp/spack-helpers/source_me.sh
