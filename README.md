@@ -25,6 +25,13 @@ Example: keep only a single gcc version:
   spack filter-compilers gcc@11.2.0 --keep-only
 ```
 
+## Intel Classic shared libraries
+The `fix-intel-lib-config` subcommand can be used to add `LD_LIBRARY_PATH` modifications to external Intel Classic (intel-oneapi-compilers-classic) specs. Without this, some package installations may fail with libimf.so not being found. Note that this should be run after detecting external Intel Classic installations.
+
+```console
+  spack fix-intel-lib-config
+```
+
 
 ## Dependency fetching for Go- and Rust/Cargo-based packages: fetch-deps (go|rust)
 The `fetch-deps` subcommand can be used to fetch dependencies for Go packages (defined in go.mod) or Rust/Cargo packages (defined in Cargo.toml). This command requires a concretized environment. It checks the environment for `go` or `rust` dependents, fetches their source code, and retrieves dependencies to `$GOMODCACHE`/`$CARGO_HOME` (or default location).
@@ -47,24 +54,24 @@ spack fetch-deps rust --use-spack-rust
 ### Duplicate checking: validate check-duplicates
 To check a concretized environment for more than one concretized spec for a given package name and ignore duplicates for specific packages `foo` and `bar`:
 ```console
-spack check-duplicates --ignore foo --ignore bar
+spack validate check-duplicates --ignore foo --ignore bar
 ```
 
 ### Allow specific packages for a given C/C++/Fortran compiler: validate allow-pkgs-for-compiler
 To verify that only specific packages to be built for a given compiler:
 ```console
-spack allow-pkgs-for-compiler gcc foo bar
+spack validate allow-pkgs-for-compiler gcc foo bar
 ```
 will return an error message if any packages other than `foo` and `bar` are spec'd with `%gcc`.
 
 ### Ensure only approved packages will be installed: validate check-approved-pkgs
 To verify that only packages explicitly approved by the user have been concretized:
 ```console
-spack check-approved-pkgs --packages foo bar
+spack validate check-approved-pkgs --packages foo bar
 ```
 or
 ```console
-spack check-approved-pkgs --pkgs-from-file approved_list.txt
+spack validate check-approved-pkgs --pkgs-from-file approved_list.txt
 ```
 where `approved_list.txt` contains newline-delimited package names:
 ```
