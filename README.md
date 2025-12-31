@@ -25,12 +25,24 @@ Example: keep only a single gcc version:
   spack filter-compilers gcc@11.2.0 --keep-only
 ```
 
-## Intel Classic shared libraries
-The `fix-intel-lib-config` subcommand can be used to add `LD_LIBRARY_PATH` modifications to external Intel Classic (intel-oneapi-compilers-classic) specs. Without this, some package installations may fail with libimf.so not being found. Note that this should be run after detecting external Intel Classic installations.
+## Intel OneAPI configuration fixes: fix-intel-config
+The `fix-intel-config` subcommand performs various fixes for Intel OneAPI external specs:
 
+1. **Library path configuration**: Adds `LD_LIBRARY_PATH` modifications to external Intel Classic (intel-oneapi-compilers-classic) specs. Without this, some package installations may fail with libimf.so not being found.
+
+2. **Compiler consolidation** (optional with `-c`/`--consolidate`): Consolidates intel-oneapi-compilers externals by version. Some Intel OneAPI installations have separate externals for C/C++ compilers (icx/icpx) and Fortran (ifx) with slightly different version numbers (e.g., 2025.3.1 vs 2025.3.0). The consolidation feature automatically merges these into a single external based on the first two version numbers.
+
+Basic usage (applies library path fix only):
 ```console
-  spack fix-intel-lib-config
+  spack fix-intel-config
 ```
+
+With compiler consolidation:
+```console
+  spack fix-intel-config --consolidate
+```
+
+Note: This should be run after detecting external Intel installations.
 
 
 ## Dependency fetching for Go- and Rust/Cargo-based packages: fetch-deps (go|rust)
