@@ -42,8 +42,8 @@ def _expand_compiler_synonyms(compiler_specs):
             full_name = synonyms[base_name]
             expanded_str = spec_str.replace(base_name, full_name, 1)
             expanded_specs.append(expanded_str)
-        else:
-            expanded_specs.append(spec_str)
+
+        expanded_specs.append(spec_str)
     
     return expanded_specs
 
@@ -112,7 +112,7 @@ def check_allowed_compilers(env, allowed_compilers):
                         continue
                     
                     # If allowed spec has no version constraint, allow any version
-                    if not allowed_spec.versions or allowed_spec.versions == spack.spec.VersionList([':']):
+                    if not allowed_spec.versions:
                         compiler_is_allowed = True
                         break
                     
