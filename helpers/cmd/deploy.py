@@ -300,10 +300,16 @@ def deploy(parser, args):
                         original_packages = definition["packages"][:]
                         definition["packages"] = []
                         for pkg_entry in original_packages:
-                            # Parse as spec to use satisfies() method
+                            # Parse as spec and check if it satisfies any requested package
                             try:
                                 spec = spack.spec.Spec(pkg_entry)
-                                if spec.name in deployment["packages_to_install"]:
+                                keep_spec = False
+                                for requested_pkg in deployment["packages_to_install"]:
+                                    requested_spec = spack.spec.Spec(requested_pkg)
+                                    if spec.satisfies(requested_spec):
+                                        keep_spec = True
+                                        break
+                                if keep_spec:
                                     definition["packages"].append(pkg_entry)
                             except:
                                 # If parsing fails, keep the entry to be safe
