@@ -34,6 +34,7 @@ from spack.extensions.helpers.check_allowed_compilers import check_allowed_compi
 from spack.extensions.helpers.fetch_cargo import fetch_cargo_dependencies
 from spack.extensions.helpers.fetch_go import fetch_go_dependencies
 from spack.extensions.helpers.allow_only_approved_packages import allow_only_approved_packages
+from spack.extensions.helpers.compiler_compat import uses_compilers_as_nodes
 
 description = "deploy spack-stack environments based on configuration"
 section = "environments"
@@ -423,9 +424,15 @@ def deploy(parser, args):
         # Collect all compilers used in the environment for module configuration
         all_compilers = set()
         for spec in env.all_specs():
-            for language in ("c", "cxx", "fortran"):
-                if language in spec:
-                    all_compilers.add(spec[language].name)
+            if uses_compilers_as_nodes(spec):
+                # New model: compiler languages are dependencies
+                for language in ("c", "cxx", "fortran"):
+                    if language in spec:
+                        all_compilers.add(spec[language].name)
+            else:
+                # Old model: use spec.compiler attribute
+                if hasattr(spec, 'compiler') and spec.compiler:
+                    all_compilers.add(spec.compiler.name)
         
         subprocess.run(
             ["spack", "--env", env_dir_full_path, "module", "lmod", "refresh", "--yes-to-all", "--upstream-modules"],

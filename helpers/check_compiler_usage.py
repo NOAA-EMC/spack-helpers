@@ -2,11 +2,14 @@
 
 This module provides functionality to validate that only specified packages
 use a particular compiler in a concretized Spack environment.
+
+Supports both old Spack (compilers.yaml) and new Spack (compilers-as-nodes).
 """
 
 from typing import List
 
 import spack.spec
+from spack.extensions.helpers.compiler_compat import uses_compilers_as_nodes
 
 
 def check_compiler_usage(env, restricted_compiler_name, allowed_packages):
@@ -14,6 +17,10 @@ def check_compiler_usage(env, restricted_compiler_name, allowed_packages):
     
     Iterates over all concretized specs in the environment and identifies
     packages that use the specified compiler but are not in the allowed list.
+    
+    Supports both:
+    - New Spack (compilers-as-nodes): Checks spec["c"], spec["cxx"], spec["fortran"]
+    - Old Spack (compilers.yaml): Checks spec.compiler.name attribute
     
     Args:
         env: A Spack Environment object to check
@@ -37,9 +44,22 @@ def check_compiler_usage(env, restricted_compiler_name, allowed_packages):
             continue
 
         # Check if this spec uses the specified compiler
-        for lang in ("c", "cxx", "fortran"):
-            if lang in concrete_spec:
-                if concrete_spec[lang].name == restricted_compiler_name:
-                    illegal_specs.append(concrete_spec)
+        uses_restricted_compiler = False
+        
+        if uses_compilers_as_nodes(concrete_spec):
+            # New approach: check language-specific compilers
+            for lang in ("c", "cxx", "fortran"):
+                if lang in concrete_spec:
+                    if concrete_spec[lang].name == restricted_compiler_name:
+                        uses_restricted_compiler = True
+                        break
+        else:
+            # Old approach: check spec.compiler.name
+            if hasattr(concrete_spec, 'compiler') and concrete_spec.compiler:
+                if concrete_spec.compiler.name == restricted_compiler_name:
+                    uses_restricted_compiler = True
+        
+        if uses_restricted_compiler:
+            illegal_specs.append(concrete_spec)
     
     return illegal_specs
