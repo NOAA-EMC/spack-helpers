@@ -21,8 +21,10 @@ from types import SimpleNamespace
 
 try:
     import spack.llnl.util.tty as tty
+    using_old_spackstack = False
 except ImportError:
     import llnl.util.tty as tty
+    using_old_spackstack = True
 import spack.cmd
 import spack.environment as ev
 from spack.error import SpackError
@@ -145,7 +147,10 @@ def get_create_env_settings(env_dir_basename, deployment, deployments, spack_sta
                     upstream_full_paths.append([upstream_full_path])
                     break
         config_dict["upstreams"] = upstream_full_paths
-    config_dict["compiler"] = deployment["compiler_hyphenated"]
+    if using_old_spackstack:
+        config_dict["compiler"] = deployment["compiler"]
+    else:
+        config_dict["compiler"] = deployment["compiler_hyphenated"]
 
     return config_dict
 
