@@ -48,6 +48,24 @@ def _expand_compiler_synonyms(compiler_specs):
     return expanded_specs
 
 
+def _compiler_matches(compiler_spec, allowed_spec):
+    """Check if a compiler spec matches an allowed spec.
+    
+    Handles matching between concrete versions (e.g., @=19.1.3.304) and
+    version ranges (e.g., @19.1.3.304) by comparing both directions.
+    
+    Args:
+        compiler_spec: The compiler spec to check
+        allowed_spec: The allowed compiler spec pattern
+        
+    Returns:
+        bool: True if the compiler matches the allowed spec
+    """
+    # Try both directions of satisfies() to handle @= vs @ differences
+    return (compiler_spec.satisfies(allowed_spec) or 
+            allowed_spec.satisfies(compiler_spec))
+
+
 def check_allowed_compilers(env, allowed_compilers):
     """Check for specs using compilers not in the allowed list.
     
@@ -90,9 +108,9 @@ def check_allowed_compilers(env, allowed_compilers):
                 if lang in concrete_spec:
                     compiler_spec = concrete_spec[lang]
                     
-                    # Check if this compiler satisfies any of the allowed compiler specs
+                    # Check if this compiler matches any of the allowed compiler specs
                     lang_is_allowed = any(
-                        compiler_spec.satisfies(allowed_spec)
+                        _compiler_matches(compiler_spec, allowed_spec)
                         for allowed_spec in allowed_compiler_specs
                     )
                     
@@ -102,26 +120,15 @@ def check_allowed_compilers(env, allowed_compilers):
         else:
             # Old approach: check spec.compiler attribute
             if hasattr(concrete_spec, 'compiler') and concrete_spec.compiler:
-                spec_compiler = concrete_spec.compiler
+                # Create a spec from the compiler for comparison
+                compiler_spec_str = f"{concrete_spec.compiler.name}@={concrete_spec.compiler.version}"
+                compiler_spec = spack.spec.Spec(compiler_spec_str)
                 
                 # Check if compiler matches any allowed spec
-                compiler_is_allowed = False
-                for allowed_spec in allowed_compiler_specs:
-                    # Compare compiler name
-                    if spec_compiler.name != allowed_spec.name:
-                        continue
-                    
-                    # If allowed spec has no version constraint, allow any version
-                    if not allowed_spec.versions or allowed_spec.versions == spack.spec.VersionList([':']):
-                        compiler_is_allowed = True
-                        break
-                    
-                    # Check if compiler version satisfies the allowed spec's version
-                    if spec_compiler.version and spec_compiler.version in allowed_spec.versions:
-                        compiler_is_allowed = True
-                        break
-                
-                is_allowed = compiler_is_allowed
+                is_allowed = any(
+                    _compiler_matches(compiler_spec, allowed_spec)
+                    for allowed_spec in allowed_compiler_specs
+                )
         
         # If this spec uses a disallowed compiler, add to illegal list
         if not is_allowed:
