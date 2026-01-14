@@ -9,7 +9,10 @@ import re
 from collections import defaultdict
 
 import spack.config
-from spack.llnl.util import tty
+try:
+    from spack.llnl.util import tty
+except ImportError:
+    from llnl.util import tty
 
 
 def fix_intel_lib_config_for_env(env):

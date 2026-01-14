@@ -6,7 +6,10 @@ including detection of duplicate package installations.
 
 import sys
 
-import spack.llnl.util.tty as tty
+try:
+    import spack.llnl.util.tty as tty
+except ImportError:
+    import llnl.util.tty as tty
 
 import spack.cmd
 import spack.environment as ev

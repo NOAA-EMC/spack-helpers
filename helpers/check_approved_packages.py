@@ -7,7 +7,10 @@ are present in a concretized Spack environment.
 from typing import List
 
 import spack.spec
-from spack.llnl.util import tty
+try:
+    from spack.llnl.util import tty
+except ImportError:
+    from llnl.util import tty
 from spack.error import SpackError
 
 

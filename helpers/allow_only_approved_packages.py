@@ -4,7 +4,10 @@ This module provides functionality to mark approved packages as buildable
 while setting all other packages as non-buildable in a Spack environment.
 """
 
-import spack.llnl.util.tty as tty
+try:
+    import spack.llnl.util.tty as tty
+except ImportError:
+    import llnl.util.tty as tty
 from spack.error import SpackError
 
 

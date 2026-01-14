@@ -19,7 +19,10 @@ import yaml
 from contextlib import redirect_stdout, redirect_stderr
 from types import SimpleNamespace
 
-import spack.llnl.util.tty as tty
+try:
+    import spack.llnl.util.tty as tty
+except ImportError:
+    import llnl.util.tty as tty
 import spack.cmd
 import spack.environment as ev
 from spack.error import SpackError

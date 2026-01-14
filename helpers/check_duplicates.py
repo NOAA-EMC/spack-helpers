@@ -8,7 +8,10 @@ from collections import defaultdict
 from typing import Dict, List, Set
 
 import spack.spec
-import spack.llnl.util.tty as tty
+try:
+    import spack.llnl.util.tty as tty
+except ImportError:
+    import llnl.util.tty as tty
 
 
 def _get_build_only_packages(env) -> Set[str]:

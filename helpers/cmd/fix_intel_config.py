@@ -5,7 +5,10 @@ This command performs various fixes for Intel OneAPI externals:
 - Consolidates intel-oneapi-compilers externals by version (optional, with -c flag)
 """
 
-import spack.llnl.util.tty as tty
+try:
+    import spack.llnl.util.tty as tty
+except ImportError:
+    import llnl.util.tty as tty
 
 import spack.cmd
 import spack.environment as ev
