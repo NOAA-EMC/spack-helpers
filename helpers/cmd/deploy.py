@@ -285,9 +285,35 @@ def deploy(parser, args):
 
         # Filter out unwanted packages before concretization
         if deployment["only_concretize_requested_packages"]:
-            for root_spec in env.roots():
-                if root_spec.name not in deployment["packages_to_install"]:
-                    env.remove(root_spec)
+            # Check if specs are defined in manifest definitions structure
+            has_definitions = (
+                "spack" in env.manifest 
+                and "definitions" in env.manifest["spack"]
+                and isinstance(env.manifest["spack"]["definitions"], list)
+            )
+            
+            if has_definitions:
+                # Remove specs from definitions lists
+                import spack.spec
+                for definition in env.manifest["spack"]["definitions"]:
+                    if isinstance(definition, dict) and "packages" in definition:
+                        original_packages = definition["packages"][:]
+                        definition["packages"] = []
+                        for pkg_entry in original_packages:
+                            # Parse as spec to use satisfies() method
+                            try:
+                                spec = spack.spec.Spec(pkg_entry)
+                                if spec.name in deployment["packages_to_install"]:
+                                    definition["packages"].append(pkg_entry)
+                            except:
+                                # If parsing fails, keep the entry to be safe
+                                definition["packages"].append(pkg_entry)
+            else:
+                # Use env.remove() for specs in roots
+                for root_spec in env.roots():
+                    if root_spec.name not in deployment["packages_to_install"]:
+                        env.remove(root_spec)
+            
             env.write()
 
         # Configure buildability if approved packages list exists or site is wcoss2
