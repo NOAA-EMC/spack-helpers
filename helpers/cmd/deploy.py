@@ -85,6 +85,11 @@ def setup_parser(subparser):
         action='store_true',
         help="List configured deployments for the detected site and exit"
     )
+    subparser.add_argument(
+        '--disable-validation-use-at-your-own-risk',
+        action='store_true',
+        help="Override ordinarily ignored validations (namely for Acorn non-WCOSS2 stacks)"
+    )
 
 
 def get_site_and_tier(deployment={}, args=None):
@@ -332,7 +337,7 @@ def deploy(parser, args):
 
         # Configure buildability if approved packages list exists or site is wcoss2
         approved_list_path = os.path.join(env_dir_full_path, "site", "approved_packages.txt")
-        if os.path.exists(approved_list_path) or deployment["site"] == "wcoss2":
+        if (os.path.exists(approved_list_path) or deployment["site"] in ["wcoss2", "acorn"]) and not args.disable_validation_use_at_your_own_risk:
             tty.msg("... configuring buildability for approved packages ...")
             approved_packages = read_approved_packages_from_file(approved_list_path)
             configured_count = allow_only_approved_packages(env, approved_packages)
@@ -390,7 +395,7 @@ def deploy(parser, args):
 
         # Check for approved packages if approved_packages.txt exists
         approved_list_path = os.path.join(env_dir_full_path, "site", "approved_packages.txt")
-        if os.path.exists(approved_list_path) or deployment["site"] == "wcoss2":
+        if (os.path.exists(approved_list_path) or deployment["site"] in ["wcoss2", "acorn"]) and not args.disable_validation_use_at_your_own_risk:
             approved_packages = read_approved_packages_from_file(approved_list_path)
             unauthorized_specs = check_approved_packages(env, approved_packages)
             if unauthorized_specs:
