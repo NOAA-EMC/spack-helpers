@@ -182,8 +182,11 @@ def run_batch_install(batch_config, deployment, env_dir_full_path, logfile, logf
             "-V", "-Wblock=true", "--",
             which("spack").path, "--env", env_dir_full_path,
             "install", "--fail-fast", "--show-log-on-error",
-            "--concurrent-packages", "4", "--jobs", "4",
         ]
+        if using_old_spackstack:
+            cmd.extend(["--jobs", "12"])
+        else:
+            cmd.extend(["--concurrent-packages", "3", "--jobs", "4"])
     else:
         raise SpackError("batch_config:scheduler must be pbspro")
     if packages_to_install:
