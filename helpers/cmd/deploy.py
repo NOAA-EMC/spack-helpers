@@ -289,7 +289,7 @@ def deploy(parser, args):
         logfile.write(str(deployment) + "\n")
         logfile.write(str(stack_settings) + "\n")
         
-        tty.msg(f"Creating environment for {deployment['template']}/{deployment['compiler']} with '{deployment['site']}' site config")
+        tty.msg(f"Creating environment for {deployment['template']}%{deployment['compiler']} with '{deployment['site']}' site config")
         tty.msg(f"  at {env_dir_full_path} ...")
         
         # Use equivalent of 'spack stack create env'
