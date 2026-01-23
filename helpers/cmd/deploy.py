@@ -26,6 +26,7 @@ except ImportError:
     import llnl.util.tty as tty
     using_old_spackstack = True
 import spack.cmd
+import spack.config
 import spack.environment as ev
 from spack.error import SpackError
 from spack.extensions.helpers.check_duplicates import check_duplicate_packages
@@ -354,7 +355,8 @@ def deploy(parser, args):
         tty.msg(f"... concretizing ...")
         with redirect_stdout(logfile), redirect_stderr(logfile):
             with env.write_transaction():
-                concretized_specs = env.concretize()
+                with spack.config.override("concretizer:reuse", False):
+                    concretized_specs = env.concretize()
                 env.write()
             ev.display_specs([concrete for _, concrete in concretized_specs])
 
