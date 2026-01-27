@@ -61,7 +61,7 @@ def test_fix_intel_lib_config_adds_ld_library_path(intel_env):
     for i, external in enumerate(intel_config['externals']):
         prefix = external['prefix']
         expected_path = f"{prefix}/compiler/lib/intel64_lin"
-        actual_path = external['extra_attributes']['environment']['prepend_path']['LD_LIBRARY_PATH']
+        actual_path = external['extra_attributes']['environment']['append_path']['LD_LIBRARY_PATH']
         assert actual_path == expected_path
 
 
