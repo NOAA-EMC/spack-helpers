@@ -242,22 +242,25 @@ def test_check_approved_packages_detects_violations(validation_test_env):
     approved_packages = ["zlib", "autoconf"]
     unauthorized_specs = check_approved_packages(env, approved_packages)
     
-    # Should find unauthorized packages (like libelf, libdwarf, etc.)
+    # Should find unauthorized packages (like libelf, libdwarf, gmake, etc.)
     assert len(unauthorized_specs) > 0, "Should detect unauthorized packages"
     
     # Verify that approved packages are not in the unauthorized list
     unauthorized_names = [spec.name for spec in unauthorized_specs]
     assert "zlib" not in unauthorized_names, "zlib should not be unauthorized"
     assert "autoconf" not in unauthorized_names, "autoconf should not be unauthorized"
+    
+    # Verify that dependencies are being checked (should find gmake as unauthorized)
+    assert "gmake" in unauthorized_names, "gmake (a dependency) should be detected as unauthorized"
 
 
 def test_check_approved_packages_all_approved(validation_test_env):
     """Test that check_approved_packages returns empty when all are approved."""
     env = validation_test_env
     
-    # Get all package names in the environment
+    # Get all package names in the environment (including dependencies)
     all_packages = set()
-    for _, concrete_spec in env.concretized_specs():
+    for concrete_spec in env.all_specs():
         all_packages.add(concrete_spec.name)
     
     # Approve all packages
@@ -277,9 +280,9 @@ def test_check_approved_packages_none_approved(validation_test_env):
     # Should find all packages as unauthorized
     assert len(unauthorized_specs) > 0, "Should detect all packages as unauthorized"
     
-    # Count should match total number of concretized specs
-    total_specs = len(list(env.concretized_specs()))
-    assert len(unauthorized_specs) == total_specs, "All specs should be unauthorized"
+    # Count should match total number of all specs (including dependencies)
+    total_specs = len(list(env.all_specs()))
+    assert len(unauthorized_specs) == total_specs, "All specs (including dependencies) should be unauthorized"
 
 
 def test_check_buildable_configuration_no_violations(validation_test_env):
