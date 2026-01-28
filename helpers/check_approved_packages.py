@@ -40,8 +40,8 @@ def read_approved_packages_from_file(filepath):
 def check_approved_packages(env, approved_packages):
     """Check for specs with package names not in the approved list.
     
-    Iterates over all concretized specs in the environment and identifies
-    specs whose package names are not in the approved list.
+    Iterates over all specs in the environment (including dependencies) and
+    identifies specs whose package names are not in the approved list.
     
     Args:
         env: A Spack Environment object to check
@@ -55,15 +55,15 @@ def check_approved_packages(env, approved_packages):
     # Convert approved_packages to a set for faster lookup
     approved_set = set(approved_packages)
     
-    # Iterate over all concretized specs in the environment
-    for user_spec, concrete_spec in env.concretized_specs():
+    # Iterate over all specs in the environment (including dependencies)
+    for concrete_spec in env.all_specs():
         pkg_name = concrete_spec.name
         
         # If this package is not approved, mark as unauthorized
         if pkg_name not in approved_set:
             unauthorized_specs.append(concrete_spec)
-            tty.debug(f"Illegal package: pkg_name")
+            tty.debug(f"Illegal package: {pkg_name}")
         else:
-            tty.debug(f"Legal package validated: pkg_name")
+            tty.debug(f"Legal package validated: {pkg_name}")
     
     return unauthorized_specs
