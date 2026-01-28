@@ -42,6 +42,7 @@ def check_approved_packages(env, approved_packages):
     
     Iterates over all specs in the environment (including dependencies) and
     identifies specs whose package names are not in the approved list.
+    External packages are excluded from this check.
     
     Args:
         env: A Spack Environment object to check
@@ -57,6 +58,11 @@ def check_approved_packages(env, approved_packages):
     
     # Iterate over all specs in the environment (including dependencies)
     for concrete_spec in env.all_specs():
+        # Skip external packages
+        if concrete_spec.external:
+            tty.debug(f"Skipping external package: {concrete_spec.name}")
+            continue
+        
         pkg_name = concrete_spec.name
         
         # If this package is not approved, mark as unauthorized
