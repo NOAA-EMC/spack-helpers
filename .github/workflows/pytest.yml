@@ -17,7 +17,7 @@ jobs:
           sudo apt install python3-pytest-xdist
           export SPACK_ROOT=$(realpath $(dirname $(which spack))/..)
           . source_me.sh
-          spack mirror rm spack-public
+          spack config add 'packages:gcc:require:"@13:"'
           spack unit-test --extension=helpers -m "not integration"
           # Run the long-running tests after we've run the short ones:
           spack unit-test --extension=helpers -n 2 -m "integration"
