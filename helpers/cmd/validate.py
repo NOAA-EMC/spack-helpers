@@ -40,11 +40,9 @@ def _is_environment_fully_concretized(env):
     Returns:
         bool: True if environment is fully concretized, False otherwise
     """
-    user_specs = set(env.user_specs)
-    concretized_user_specs = set(env.concretized_user_specs)
-    
+
     # Check if all user specs are concretized
-    return user_specs == concretized_user_specs
+    return all([x in env.concrete_specs for x in env.user_specs])
 
 
 def setup_parser(subparser):
