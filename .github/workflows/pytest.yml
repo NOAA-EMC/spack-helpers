@@ -16,6 +16,7 @@ jobs:
           sudo rm -rf /usr/local &
           export SPACK_ROOT=$(realpath $(dirname $(which spack))/..)
           . source_me.sh
+          spack filter-compilers --keep-only gcc@13:
           spack unit-test --extension=helpers -m "not integration"
           # Run the long-running tests after we've run the short ones:
           spack unit-test --extension=helpers -m "integration"
