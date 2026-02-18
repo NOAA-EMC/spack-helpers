@@ -4,7 +4,7 @@ on: [push, pull_request, workflow_dispatch]
 
 jobs:
   test:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-slim
     steps:
       - uses: actions/checkout@v4
       
@@ -15,11 +15,8 @@ jobs:
       - name: Run tests
         shell: spack-bash {0}
         run: |
-          sudo rm -rf /usr/local &
-          sudo apt install python3-pytest-xdist
           export SPACK_ROOT=$(realpath $(dirname $(which spack))/..)
           . source_me.sh
           spack unit-test --extension=helpers -m "not integration"
           # Run the long-running tests after we've run the short ones:
-          export TMPDIR=/dev/shm
-          spack unit-test --extension=helpers -n 2 -m "integration"
+          spack unit-test --extension=helpers -m "integration"
