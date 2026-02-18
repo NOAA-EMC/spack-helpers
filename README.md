@@ -59,6 +59,27 @@ spack fetch-deps rust --use-spack-rust
 ```
 
 
+## Create Python virtual environments from Spack installs: create-python-venv
+The `create-python-venv` command interactively creates a Python virtual environment and integrates selected Spack-installed Python packages.
+
+```console
+spack create-python-venv [venv-path]
+```
+
+Behavior:
+
+1. If no Spack environment is active, it lists environments (equivalent to `spack env ls`) and prompts for one to activate.
+2. It lists installed `python` specs in that environment and prompts for one selection (even if there is only one).
+3. It lists installed packages whose build-system type is `PythonPackage` and allows selecting multiple entries.
+4. It errors if the selection includes more than one spec with the same package name.
+5. It creates the venv using the selected Python and writes a `.pth` integration file under the venv to include selected package paths.
+
+After creation, activate with:
+```console
+source <venv-path>/bin/activate
+```
+
+
 ## Environment validation
 > [!IMPORTANT]
 > All of the following commands must be run in an active, concretized environment. Unconcretized root specs will not be accounted for.
