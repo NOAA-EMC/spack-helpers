@@ -101,6 +101,13 @@ spack validate compilers intel-oneapi-compilers gcc
 ```
 will return an error if any packages have `c`/`cxx`/`fortran` providers that are not `intel-oneapi-compilers` or `gcc`.
 
+### Verify unbuildable packages are not being built: validate check-buildable
+To verify that packages marked as `buildable:false` in the environment configuration are not being built (i.e., they use externals):
+```console
+spack validate check-buildable
+```
+will return an error if any packages are marked as `buildable:false` but are nonetheless being built.
+
 
 ## spack-stack deployment
 To run a deploy based on a deployments.yaml for a given spack-stack directory and site, run

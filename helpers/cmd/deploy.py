@@ -19,8 +19,14 @@ import yaml
 from contextlib import redirect_stdout, redirect_stderr
 from types import SimpleNamespace
 
-import spack.llnl.util.tty as tty
+try:
+    import spack.llnl.util.tty as tty
+    using_old_spackstack = False
+except ImportError:
+    import llnl.util.tty as tty
+    using_old_spackstack = True
 import spack.cmd
+import spack.config
 import spack.environment as ev
 from spack.error import SpackError
 from spack.extensions.helpers.check_duplicates import check_duplicate_packages
@@ -34,6 +40,7 @@ from spack.extensions.helpers.check_allowed_compilers import check_allowed_compi
 from spack.extensions.helpers.fetch_cargo import fetch_cargo_dependencies
 from spack.extensions.helpers.fetch_go import fetch_go_dependencies
 from spack.extensions.helpers.allow_only_approved_packages import allow_only_approved_packages
+from spack.extensions.helpers.compiler_compat import uses_compilers_as_nodes
 
 description = "deploy spack-stack environments based on configuration"
 section = "environments"
@@ -78,6 +85,11 @@ def setup_parser(subparser):
         '-l', '--list-only',
         action='store_true',
         help="List configured deployments for the detected site and exit"
+    )
+    subparser.add_argument(
+        '--disable-validation-use-at-your-own-risk',
+        action='store_true',
+        help="Override ordinarily ignored validations (namely for Acorn non-WCOSS2 stacks)"
     )
 
 
@@ -141,7 +153,10 @@ def get_create_env_settings(env_dir_basename, deployment, deployments, spack_sta
                     upstream_full_paths.append([upstream_full_path])
                     break
         config_dict["upstreams"] = upstream_full_paths
-    config_dict["compiler"] = deployment["compiler_hyphenated"]
+    if using_old_spackstack:
+        config_dict["compiler"] = deployment["compiler"]
+    else:
+        config_dict["compiler"] = deployment["compiler_hyphenated"]
 
     return config_dict
 
@@ -168,8 +183,11 @@ def run_batch_install(batch_config, deployment, env_dir_full_path, logfile, logf
             "-V", "-Wblock=true", "--",
             which("spack").path, "--env", env_dir_full_path,
             "install", "--fail-fast", "--show-log-on-error",
-            "--concurrent-packages", "4", "--jobs", "4",
         ]
+        if using_old_spackstack:
+            cmd.extend(["--jobs", "12"])
+        else:
+            cmd.extend(["--concurrent-packages", "3", "--jobs", "4"])
     else:
         raise SpackError("batch_config:scheduler must be pbspro")
     if packages_to_install:
@@ -272,7 +290,7 @@ def deploy(parser, args):
         logfile.write(str(deployment) + "\n")
         logfile.write(str(stack_settings) + "\n")
         
-        tty.msg(f"Creating environment for {deployment['template']}/{deployment['compiler']} with '{deployment['site']}' site config")
+        tty.msg(f"Creating environment for {deployment['template']}%{deployment['compiler']} with '{deployment['site']}' site config")
         tty.msg(f"  at {env_dir_full_path} ...")
         
         # Use equivalent of 'spack stack create env'
@@ -284,14 +302,46 @@ def deploy(parser, args):
 
         # Filter out unwanted packages before concretization
         if deployment["only_concretize_requested_packages"]:
-            for root_spec in env.roots():
-                if root_spec.name not in deployment["packages_to_install"]:
-                    env.remove(root_spec)
+            # Check if specs are defined in manifest definitions structure
+            has_definitions = (
+                "spack" in env.manifest 
+                and "definitions" in env.manifest["spack"]
+                and isinstance(env.manifest["spack"]["definitions"], list)
+            )
+            
+            if has_definitions:
+                # Remove specs from definitions lists
+                import spack.spec
+                for definition in env.manifest["spack"]["definitions"]:
+                    if isinstance(definition, dict) and "packages" in definition:
+                        original_packages = definition["packages"][:]
+                        definition["packages"] = []
+                        for pkg_entry in original_packages:
+                            # Parse as spec and check if it satisfies any requested package
+                            try:
+                                spec = spack.spec.Spec(pkg_entry)
+                                keep_spec = False
+                                for requested_pkg in deployment["packages_to_install"]:
+                                    requested_spec = spack.spec.Spec(requested_pkg)
+                                    if spec.satisfies(requested_spec):
+                                        keep_spec = True
+                                        break
+                                if keep_spec:
+                                    definition["packages"].append(pkg_entry)
+                            except:
+                                # If parsing fails, keep the entry to be safe
+                                definition["packages"].append(pkg_entry)
+            else:
+                # Use env.remove() for specs in roots
+                for root_spec in env.roots():
+                    if root_spec.name not in deployment["packages_to_install"]:
+                        env.remove(root_spec)
+            
             env.write()
 
         # Configure buildability if approved packages list exists or site is wcoss2
         approved_list_path = os.path.join(env_dir_full_path, "site", "approved_packages.txt")
-        if os.path.exists(approved_list_path) or deployment["site"] == "wcoss2":
+        if (os.path.exists(approved_list_path) or deployment["site"] in ["wcoss2", "acorn"]) and not args.disable_validation_use_at_your_own_risk:
             tty.msg("... configuring buildability for approved packages ...")
             approved_packages = read_approved_packages_from_file(approved_list_path)
             configured_count = allow_only_approved_packages(env, approved_packages)
@@ -305,7 +355,8 @@ def deploy(parser, args):
         tty.msg(f"... concretizing ...")
         with redirect_stdout(logfile), redirect_stderr(logfile):
             with env.write_transaction():
-                concretized_specs = env.concretize()
+                with spack.config.override("concretizer:reuse", False):
+                    concretized_specs = env.concretize()
                 env.write()
             ev.display_specs([concrete for _, concrete in concretized_specs])
 
@@ -349,7 +400,7 @@ def deploy(parser, args):
 
         # Check for approved packages if approved_packages.txt exists
         approved_list_path = os.path.join(env_dir_full_path, "site", "approved_packages.txt")
-        if os.path.exists(approved_list_path) or deployment["site"] == "wcoss2":
+        if (os.path.exists(approved_list_path) or deployment["site"] in ["wcoss2", "acorn"]) and not args.disable_validation_use_at_your_own_risk:
             approved_packages = read_approved_packages_from_file(approved_list_path)
             unauthorized_specs = check_approved_packages(env, approved_packages)
             if unauthorized_specs:
@@ -423,9 +474,15 @@ def deploy(parser, args):
         # Collect all compilers used in the environment for module configuration
         all_compilers = set()
         for spec in env.all_specs():
-            for language in ("c", "cxx", "fortran"):
-                if language in spec:
-                    all_compilers.add(spec[language].name)
+            if uses_compilers_as_nodes(spec):
+                # New model: compiler languages are dependencies
+                for language in ("c", "cxx", "fortran"):
+                    if language in spec:
+                        all_compilers.add(spec[language].name)
+            else:
+                # Old model: use spec.compiler attribute
+                if hasattr(spec, 'compiler') and spec.compiler:
+                    all_compilers.add(spec.compiler.name)
         
         subprocess.run(
             ["spack", "--env", env_dir_full_path, "module", "lmod", "refresh", "--yes-to-all", "--upstream-modules"],

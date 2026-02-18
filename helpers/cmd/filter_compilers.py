@@ -4,7 +4,10 @@ This command filters compiler packages in the packages configuration
 based on user-specified compiler specs.
 """
 
-import spack.llnl.util.tty as tty
+try:
+    import spack.llnl.util.tty as tty
+except ImportError:
+    import llnl.util.tty as tty
 
 import spack.cmd
 import spack.environment as ev

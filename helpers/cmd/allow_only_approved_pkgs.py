@@ -4,7 +4,10 @@ This command configures a Spack environment so that only approved packages
 are buildable while all other packages are marked as non-buildable.
 """
 
-import spack.llnl.util.tty as tty
+try:
+    import spack.llnl.util.tty as tty
+except ImportError:
+    import llnl.util.tty as tty
 
 import spack.cmd
 import spack.environment as ev

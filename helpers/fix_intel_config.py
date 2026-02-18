@@ -9,7 +9,10 @@ import re
 from collections import defaultdict
 
 import spack.config
-from spack.llnl.util import tty
+try:
+    from spack.llnl.util import tty
+except ImportError:
+    from llnl.util import tty
 
 
 def fix_intel_lib_config_for_env(env):
@@ -19,7 +22,7 @@ def fix_intel_lib_config_for_env(env):
     this function adds:
         extra_attributes:
           environment:
-            append_path:
+            prepend_path:
               LD_LIBRARY_PATH: <prefix>/linux/compiler/lib/intel64_lin
     
     This function only modifies the environment's spack.yaml file. If an external
@@ -88,24 +91,24 @@ def fix_intel_lib_config_for_env(env):
         
         environment = extra_attrs['environment']
         
-        # Check if append_path already exists
-        if 'append_path' not in environment:
-            environment['append_path'] = {}
+        # Check if prepend_path already exists
+        if 'prepend_path' not in environment:
+            environment['prepend_path'] = {}
         
-        append_path = environment['append_path']
+        prepend_path = environment['prepend_path']
         
         # Check if LD_LIBRARY_PATH already exists
-        if 'LD_LIBRARY_PATH' not in append_path:
+        if 'LD_LIBRARY_PATH' not in prepend_path:
             # Add the LD_LIBRARY_PATH
-            append_path['LD_LIBRARY_PATH'] = lib_path
+            prepend_path['LD_LIBRARY_PATH'] = lib_path
             modified_count += 1
             tty.debug(f"Added LD_LIBRARY_PATH={lib_path} for spec {external['spec']}")
         else:
             # Check if the path is already correct
-            existing_path = append_path['LD_LIBRARY_PATH']
+            existing_path = prepend_path['LD_LIBRARY_PATH']
             if existing_path != lib_path:
                 # Update the path
-                append_path['LD_LIBRARY_PATH'] = lib_path
+                prepend_path['LD_LIBRARY_PATH'] = lib_path
                 modified_count += 1
                 tty.debug(f"Updated LD_LIBRARY_PATH from {existing_path} to {lib_path} for spec {external['spec']}")
             else:

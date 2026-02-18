@@ -280,9 +280,9 @@ def test_check_approved_packages_none_approved(validation_test_env):
     # Should find all packages as unauthorized
     assert len(unauthorized_specs) > 0, "Should detect all packages as unauthorized"
     
-    # Count should match total number of all specs (including dependencies)
-    total_specs = len(list(env.all_specs()))
-    assert len(unauthorized_specs) == total_specs, "All specs (including dependencies) should be unauthorized"
+    # Count should match total number of non-external specs (including dependencies)
+    total_non_external_specs = len([s for s in env.all_specs() if not s.external])
+    assert len(unauthorized_specs) == total_non_external_specs, "All non-external specs (including dependencies) should be unauthorized"
 
 
 def test_check_buildable_configuration_no_violations(validation_test_env):

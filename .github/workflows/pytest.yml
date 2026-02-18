@@ -9,6 +9,8 @@ jobs:
       - uses: actions/checkout@v4
       
       - uses: spack/setup-spack@v2
+        with:
+          buildcache: false
       
       - name: Run tests
         shell: spack-bash {0}
@@ -16,7 +18,6 @@ jobs:
           sudo rm -rf /usr/local &
           export SPACK_ROOT=$(realpath $(dirname $(which spack))/..)
           . source_me.sh
-          spack mirror rm spack-public
           spack unit-test --extension=helpers -m "not integration"
           # Run the long-running tests after we've run the short ones:
           spack unit-test --extension=helpers -m "integration"
