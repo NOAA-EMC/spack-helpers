@@ -150,6 +150,62 @@ def test_create_venv_sets_pythonpath(monkeypatch, tmp_path):
     assert captured["env"]["PYTHONPATH"] == "/from/spack/one:/from/spack/two:/already/present"
 
 
+def test_build_pip_install_args_from_path_requirements(tmp_path):
+    """Path helper should produce -r install args for requirements.txt."""
+    requirements = tmp_path / "requirements.txt"
+    requirements.write_text("pytest\n", encoding="utf-8")
+
+    args, source = cmd._build_pip_install_args_from_path(str(requirements))
+
+    assert args == ["-r", str(requirements)]
+    assert "requirements.txt" in source
+
+
+def test_build_pip_install_args_from_path_pyproject_file(tmp_path):
+    """Path helper should install from project directory when given pyproject.toml."""
+    pyproject = tmp_path / "pyproject.toml"
+    pyproject.write_text("[project]\nname='demo'\nversion='0.1.0'\n", encoding="utf-8")
+
+    args, source = cmd._build_pip_install_args_from_path(str(pyproject))
+
+    assert args == [str(tmp_path)]
+    assert "pyproject.toml" in source
+
+
+def test_select_pip_install_args_manual_list(monkeypatch):
+    """Manual package selection should parse shell-style package tokens."""
+    responses = iter(["4", "requests==2.32.0 'urllib3<3'"])
+    monkeypatch.setattr("builtins.input", lambda _prompt: next(responses))
+
+    args, source = cmd._select_pip_install_args()
+
+    assert args == ["requests==2.32.0", "urllib3<3"]
+    assert source == "manual package list"
+
+
+def test_install_pip_packages_executes_venv_pip(monkeypatch, tmp_path):
+    """pip install should run via the newly-created venv pip binary."""
+    venv_path = tmp_path / "venv"
+    pip_path = venv_path / "bin" / "pip"
+    pip_path.parent.mkdir(parents=True)
+    pip_path.write_text("", encoding="utf-8")
+
+    captured = {}
+
+    def _fake_run(command, check=None):
+        captured["command"] = command
+        captured["check"] = check
+        return types.SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(cmd.subprocess, "run", _fake_run)
+
+    installed = cmd._install_pip_packages(str(venv_path), ["-r", "/tmp/requirements.txt"])
+
+    assert installed is True
+    assert captured["command"] == [str(pip_path), "install", "-r", "/tmp/requirements.txt"]
+    assert captured["check"] is True
+
+
 def test_create_python_venv_command_flow(monkeypatch):
     """Top-level command function should coordinate helper calls successfully."""
     fake_env = object()
@@ -159,9 +215,11 @@ def test_create_python_venv_command_flow(monkeypatch):
     monkeypatch.setattr(cmd, "_select_environment_if_needed", lambda: fake_env)
     monkeypatch.setattr(cmd, "_select_python_installation", lambda _env: fake_python_spec)
     monkeypatch.setattr(cmd, "_select_python_packages", lambda _env: fake_packages)
+    monkeypatch.setattr(cmd, "_select_pip_install_args", lambda: (["requests"], "manual package list"))
     monkeypatch.setattr(cmd, "_gather_python_paths", lambda _specs: ["/path/one"])
     monkeypatch.setattr(cmd, "_create_venv", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(cmd, "_write_integration_pth", lambda *_args, **_kwargs: "/venv/site/spack_selected_packages.pth")
+    monkeypatch.setattr(cmd, "_install_pip_packages", lambda *_args, **_kwargs: True)
 
     messages = []
     monkeypatch.setattr(cmd.tty, "msg", lambda message: messages.append(("msg", message)))
@@ -173,3 +231,4 @@ def test_create_python_venv_command_flow(monkeypatch):
     assert result == 0
     assert any("Created virtual environment" in message for level, message in messages if level == "msg")
     assert any("Integrated package paths" in message for level, message in messages if level == "msg")
+    assert any("Installed pip packages" in message for level, message in messages if level == "msg")

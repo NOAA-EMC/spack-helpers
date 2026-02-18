@@ -1,6 +1,7 @@
 """Create a Python virtual environment from packages in a Spack environment."""
 
 import os
+import shlex
 import subprocess
 from collections import Counter
 
@@ -258,6 +259,102 @@ def _write_integration_pth(venv_path, python_paths):
     return pth_file
 
 
+def _build_pip_install_args_from_path(raw_path):
+    resolved_path = os.path.abspath(os.path.expanduser(raw_path))
+
+    if os.path.isdir(resolved_path):
+        pyproject_path = os.path.join(resolved_path, "pyproject.toml")
+        if os.path.isfile(pyproject_path):
+            return [resolved_path], f"pyproject.toml in {resolved_path}"
+        raise ValueError("Directory does not contain pyproject.toml")
+
+    if not os.path.isfile(resolved_path):
+        raise ValueError(f"Path does not exist: {resolved_path}")
+
+    basename = os.path.basename(resolved_path)
+    if basename == "requirements.txt":
+        return ["-r", resolved_path], f"requirements.txt at {resolved_path}"
+    if basename == "pyproject.toml":
+        return [os.path.dirname(resolved_path)], f"pyproject.toml at {resolved_path}"
+
+    raise ValueError(
+        "Path must be requirements.txt, pyproject.toml, or a directory containing pyproject.toml"
+    )
+
+
+def _select_pip_install_args():
+    tty.msg("Choose how to populate the new virtual environment with pip install:")
+    tty.msg("  [1] Use requirements.txt in current directory")
+    tty.msg("  [2] Use pyproject.toml in current directory")
+    tty.msg("  [3] Specify path to requirements.txt/pyproject.toml")
+    tty.msg("  [4] Enter a manual list of pip packages")
+    tty.msg("Press Enter to skip pip installation.")
+
+    while True:
+        selection = input("Selection: ").strip()
+        if not selection:
+            return None, None
+
+        if selection == "1":
+            req_path = os.path.abspath("requirements.txt")
+            if not os.path.isfile(req_path):
+                tty.warn(f"requirements.txt not found in current directory: {req_path}")
+                continue
+            return ["-r", req_path], f"requirements.txt at {req_path}"
+
+        if selection == "2":
+            pyproject_path = os.path.abspath("pyproject.toml")
+            if not os.path.isfile(pyproject_path):
+                tty.warn(f"pyproject.toml not found in current directory: {pyproject_path}")
+                continue
+            return [os.getcwd()], f"pyproject.toml in {os.getcwd()}"
+
+        if selection == "3":
+            raw_path = input(
+                "Enter path to requirements.txt, pyproject.toml, or directory with pyproject.toml: "
+            ).strip()
+            if not raw_path:
+                tty.warn("No path provided")
+                continue
+            try:
+                return _build_pip_install_args_from_path(raw_path)
+            except ValueError as err:
+                tty.warn(str(err))
+                continue
+
+        if selection == "4":
+            raw_packages = input("Enter pip packages (space-separated): ").strip()
+            try:
+                packages = shlex.split(raw_packages)
+            except ValueError as err:
+                tty.warn(f"Invalid package list: {err}")
+                continue
+
+            if not packages:
+                tty.warn("No packages provided")
+                continue
+
+            return packages, "manual package list"
+
+        tty.warn("Invalid selection. Choose 1, 2, 3, 4, or press Enter to skip.")
+
+
+def _install_pip_packages(venv_path, pip_install_args):
+    if not pip_install_args:
+        return False
+
+    venv_pip = os.path.join(venv_path, "bin", "pip")
+    if not os.path.isfile(venv_pip):
+        raise SpackError(f"pip executable not found in created virtual environment: {venv_pip}")
+
+    try:
+        subprocess.run([venv_pip, "install"] + pip_install_args, check=True)
+    except subprocess.CalledProcessError as err:
+        raise SpackError(f"Failed to install pip packages in virtual environment: {err}")
+
+    return True
+
+
 def _create_venv(python_spec, venv_path, python_paths):
     python_exe = os.path.join(str(python_spec.prefix), "bin", "python")
     if not os.path.isfile(python_exe):
@@ -286,11 +383,13 @@ def create_python_venv(parser, args):
 
         python_spec = _select_python_installation(env)
         python_packages = _select_python_packages(env)
+        pip_install_args, pip_install_source = _select_pip_install_args()
 
         python_paths = _gather_python_paths(python_packages)
 
         _create_venv(python_spec, args.venv_path, python_paths)
         pth_file = _write_integration_pth(args.venv_path, python_paths)
+        pip_installed = _install_pip_packages(args.venv_path, pip_install_args)
 
         tty.msg(f"Created virtual environment at '{args.venv_path}'.")
         tty.msg(f"Python interpreter: {_format_spec(python_spec)}")
@@ -306,6 +405,11 @@ def create_python_venv(parser, args):
                 )
         else:
             tty.msg("No PythonPackage specs selected.")
+
+        if pip_installed:
+            tty.msg(f"Installed pip packages using {pip_install_source}.")
+        else:
+            tty.msg("Skipped pip package installation.")
 
         tty.msg(f"Activate with: source {args.venv_path}/bin/activate")
         return 0

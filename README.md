@@ -72,7 +72,8 @@ Behavior:
 2. It lists installed `python` specs in that environment and prompts for one selection (even if there is only one).
 3. It lists installed packages whose build-system type is `PythonPackage` and allows selecting multiple entries.
 4. It errors if the selection includes more than one spec with the same package name.
-5. It creates the venv using the selected Python and writes a `.pth` integration file under the venv to include selected package paths.
+5. It optionally populates the new venv with `pip install` from one of: `requirements.txt` in current directory, `pyproject.toml` in current directory, a user-provided `requirements.txt`/`pyproject.toml` path, or a manually entered package list.
+6. It creates the venv using the selected Python and writes a `.pth` integration file under the venv to include selected package paths.
 
 After creation, activate with:
 ```console
