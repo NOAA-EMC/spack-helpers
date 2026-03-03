@@ -34,9 +34,6 @@ def _validation_env_base(tmp_path_factory):
     env_path.mkdir(exist_ok=False)
     env = ev.create_in_dir(env_path, with_view=False)
     
-    # Configure concretizer to unify when possible
-    env.unify = "when_possible"
-    
     # Add specs that will create various validation scenarios
     specs_to_add = [
         # Duplicates: zlib with two different variants
@@ -63,7 +60,8 @@ def _validation_env_base(tmp_path_factory):
     env.write()
     
     # Concretize the environment once
-    env.concretize()
+    with spack.config.override("concretizer:unify", "when_possible"):
+        env.concretize()
     env.write()
     
     return env
