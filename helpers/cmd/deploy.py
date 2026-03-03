@@ -89,7 +89,7 @@ def setup_parser(subparser):
     subparser.add_argument(
         '--disable-validation-use-at-your-own-risk',
         action='store_true',
-        help="Override ordinarily ignored validations (namely for Acorn non-WCOSS2 stacks)"
+        help="Skip validation steps (namely for Acorn non-WCOSS2 stacks)"
     )
 
 
