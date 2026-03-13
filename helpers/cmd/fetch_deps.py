@@ -91,13 +91,14 @@ def fetch_deps(parser, args):
         tty.warn(f"{env_var_name} environment variable not set.")
 
     # Get specs to process
+    all_concrete = [s for s in env.all_specs() if s.concrete]
     if args.specs:
-        specs = [s[1] for s in env.concretized_specs() if any([s[1].satisfies(abstract_spec) for abstract_spec in args.specs])]
+        specs = [s for s in all_concrete if any(s.satisfies(abstract_spec) for abstract_spec in args.specs)]
         for abstract_spec in args.specs:
-            if all([not s[1].satisfies(abstract_spec) for s in env.concretized_specs()]):
+            if all(not s.satisfies(abstract_spec) for s in all_concrete):
                 tty.warn(f"No concretized specs could be found matching '{abstract_spec}'")
     else:
-        specs = [s[1] for s in env.concretized_specs() if args.deps_command in s[1]]
+        specs = [s for s in all_concrete if args.deps_command in s]
     
     if not specs:
         tty.warn("No specs found to process")
