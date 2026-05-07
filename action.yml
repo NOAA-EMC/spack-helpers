@@ -28,5 +28,5 @@ runs:
           echo "SPACK_ROOT=$SPACK_ROOT" >> $GITHUB_ENV
         fi
         # Creating separate dir because it must be named 'spack-helpers'
-        cp -r ${{ github.action_path }} /tmp/spack-helpers
+        cp -r $GITHUB_ACTION_PATH /tmp/spack-helpers
         . /tmp/spack-helpers/source_me.sh
