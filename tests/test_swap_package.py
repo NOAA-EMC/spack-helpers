@@ -104,7 +104,13 @@ def test_swap_package_command_flow(monkeypatch, swap_package_env):
     monkeypatch.setattr(cmd.tty, "msg", lambda message: msgs.append(message))
     monkeypatch.setattr(cmd.tty, "warn", lambda _message: None)
 
-    args = types.SimpleNamespace(package_spec="zlib@1.3.1", fresh=True)
+    args = types.SimpleNamespace(
+        package_spec="zlib@1.3.1",
+        fresh=True,
+        readd_removed_dependents=False,
+        dependent_spec=[],
+        uninstall_removed=False,
+    )
     with swap_package_env:
         result = cmd.swap_package(None, args)
 
@@ -120,3 +126,122 @@ def test_swap_package_command_flow(monkeypatch, swap_package_env):
     assert concretize_calls == [(None, False)]
     # User-facing summary should include the removal message path.
     assert any("Removed" in message for message in msgs)
+
+
+def test_swap_package_readd_dependents_by_name_and_spec(monkeypatch, swap_package_env):
+    """Re-add removed dependents by package name and allow explicit spec overrides."""
+
+    monkeypatch.setattr(cmd.spack.cmd, "disambiguate_spec", lambda spec, _env: types.SimpleNamespace(name=spec.name))
+
+    fake_parent_specs = [types.SimpleNamespace(name="hdf5"), types.SimpleNamespace(name="netcdf-c")]
+    monkeypatch.setattr(
+        cmd.spack.store.STORE.db,
+        "installed_relatives",
+        lambda selected, relation, transitive=True: fake_parent_specs,
+    )
+    monkeypatch.setattr(
+        cmd,
+        "_compute_possible_transitive_dependents",
+        lambda name: {"zlib", "hdf5", "netcdf-c", "parallel-netcdf"},
+    )
+
+    msgs = []
+    monkeypatch.setattr(cmd.tty, "msg", lambda message: msgs.append(message))
+    monkeypatch.setattr(cmd.tty, "warn", lambda _message: None)
+
+    args = types.SimpleNamespace(
+        package_spec="zlib@1.3.1",
+        fresh=False,
+        readd_removed_dependents=True,
+        dependent_spec=["hdf5@1.14.0"],
+        uninstall_removed=False,
+    )
+
+    with swap_package_env:
+        result = cmd.swap_package(None, args)
+
+    assert result == 0
+    user_specs_by_name = {spec.name: spec for spec in swap_package_env.user_specs}
+    assert set(user_specs_by_name) == {"cmake", "hdf5", "netcdf-c"}
+    assert user_specs_by_name["hdf5"].satisfies("hdf5@1.14.0")
+    assert swap_package_env.manifest.configuration["packages"]["hdf5"]["buildable"] is True
+    assert swap_package_env.manifest.configuration["packages"]["netcdf-c"]["buildable"] is True
+    assert any("Added" in message for message in msgs)
+
+
+def test_swap_package_adds_selected_when_missing(monkeypatch, swap_package_env):
+    """If selected package is not already an environment root, command should warn and add it."""
+    monkeypatch.setattr(cmd.spack.cmd, "disambiguate_spec", lambda spec, _env: types.SimpleNamespace(name=spec.name))
+    monkeypatch.setattr(
+        cmd.spack.store.STORE.db,
+        "installed_relatives",
+        lambda selected, relation, transitive=True: [],
+    )
+    monkeypatch.setattr(
+        cmd,
+        "_compute_possible_transitive_dependents",
+        lambda name: {"libpng"},
+    )
+
+    warns = []
+    msgs = []
+    monkeypatch.setattr(cmd.tty, "warn", lambda message: warns.append(message))
+    monkeypatch.setattr(cmd.tty, "msg", lambda message: msgs.append(message))
+
+    args = types.SimpleNamespace(
+        package_spec="libpng@1.6.43",
+        fresh=False,
+        readd_removed_dependents=False,
+        dependent_spec=[],
+        uninstall_removed=False,
+    )
+
+    with swap_package_env:
+        result = cmd.swap_package(None, args)
+
+    assert result == 0
+    user_spec_names = {spec.name for spec in swap_package_env.user_specs}
+    assert "libpng" in user_spec_names
+    assert "cmake" in user_spec_names
+    assert any("not a root" in message for message in warns)
+    assert any("Added" in message for message in msgs)
+
+
+def test_swap_package_optional_uninstall_removed(monkeypatch, swap_package_env):
+    """Uninstall of removed packages should only occur when explicitly requested."""
+    monkeypatch.setattr(cmd.spack.cmd, "disambiguate_spec", lambda spec, _env: types.SimpleNamespace(name=spec.name))
+
+    fake_parent_specs = [types.SimpleNamespace(name="hdf5"), types.SimpleNamespace(name="netcdf-c")]
+    monkeypatch.setattr(
+        cmd.spack.store.STORE.db,
+        "installed_relatives",
+        lambda selected, relation, transitive=True: fake_parent_specs,
+    )
+    monkeypatch.setattr(
+        cmd,
+        "_compute_possible_transitive_dependents",
+        lambda name: {"zlib", "hdf5", "netcdf-c"},
+    )
+
+    uninstall_calls = []
+    monkeypatch.setattr(
+        cmd,
+        "_uninstall_installed_packages_by_name",
+        lambda _env, package_names: uninstall_calls.append(set(package_names)) or [],
+    )
+    monkeypatch.setattr(cmd.tty, "warn", lambda _message: None)
+    monkeypatch.setattr(cmd.tty, "msg", lambda _message: None)
+
+    args = types.SimpleNamespace(
+        package_spec="zlib@1.3.1",
+        fresh=False,
+        readd_removed_dependents=False,
+        dependent_spec=[],
+        uninstall_removed=True,
+    )
+
+    with swap_package_env:
+        result = cmd.swap_package(None, args)
+
+    assert result == 0
+    assert uninstall_calls == [{"zlib", "hdf5", "netcdf-c"}]

@@ -12,10 +12,12 @@ except ImportError:
 
 import spack.cmd
 import spack.cmd.dependents as dependents_cmd
+import spack.cmd.uninstall as uninstall_cmd
 import spack.config
 import spack.environment as ev
 import spack.spec
 import spack.store
+from spack.enums import InstallRecordStatus
 from spack.error import SpackError
 
 description = "swap an environment to a selected package and its transitive dependents"
@@ -33,6 +35,23 @@ def setup_parser(subparser):
         "--fresh",
         action="store_true",
         help="run concretization after updates (equivalent to 'spack concretize --fresh')"
+    )
+    subparser.add_argument(
+        "--readd-removed-dependents",
+        action="store_true",
+        help="re-add removed dependents to the environment by package name only"
+    )
+    subparser.add_argument(
+        "--dependent-spec",
+        action="append",
+        default=[],
+        metavar="SPEC",
+        help="explicit dependent spec to add back (repeatable, supports versions/variants)"
+    )
+    subparser.add_argument(
+        "--uninstall-removed",
+        action="store_true",
+        help="uninstall installed specs corresponding to removed package roots"
     )
 
 
@@ -80,6 +99,47 @@ def _remove_matching_roots(env, package_names):
     return removed_names
 
 
+def _add_root_specs(env, spec_strings):
+    """Add root specs and return added spec strings."""
+    added = []
+    for spec_str in spec_strings:
+        if env.add(spec_str):
+            added.append(spec_str)
+    return added
+
+
+def _find_installed_specs_for_package_names(env, package_names):
+    """Return installed specs in the active environment for package names."""
+    hashes = env.all_hashes()
+    installed = []
+    seen_hashes = set()
+
+    for pkg_name in sorted(package_names):
+        matches = spack.store.STORE.db.query_local(
+            spack.spec.Spec(pkg_name),
+            hashes=hashes,
+            installed=(InstallRecordStatus.INSTALLED | InstallRecordStatus.DEPRECATED),
+        )
+        for spec in matches:
+            dag_hash = spec.dag_hash()
+            if dag_hash in seen_hashes:
+                continue
+            seen_hashes.add(dag_hash)
+            installed.append(spec)
+
+    return installed
+
+
+def _uninstall_installed_packages_by_name(env, package_names):
+    """Uninstall installed specs matching package names in the active environment."""
+    specs_to_uninstall = _find_installed_specs_for_package_names(env, package_names)
+    if not specs_to_uninstall:
+        return []
+
+    uninstall_cmd.do_uninstall(specs_to_uninstall, force=False)
+    return specs_to_uninstall
+
+
 def swap_package(parser, args):
     """Handle swap-package command."""
     env = ev.active_environment()
@@ -94,6 +154,14 @@ def swap_package(parser, args):
     selected_pkg_name = selected_query.name
     if not selected_pkg_name:
         raise SpackError("Could not determine package name from the provided spec.")
+
+    existing_root_names = {spec.name for spec in env.user_specs}
+    selected_missing_from_roots = selected_pkg_name not in existing_root_names
+    if selected_missing_from_roots:
+        tty.warn(
+            f"Selected package '{selected_pkg_name}' is not a root in the active environment; "
+            "adding it as a root spec."
+        )
 
     # Installed transitive dependents (equivalent to: spack dependents -t -i <spec>)
     installed_dependents = []
@@ -114,12 +182,25 @@ def swap_package(parser, args):
 
     remove_package_names = {selected_pkg_name}
     remove_package_names.update(spec.name for spec in installed_dependents)
+    remove_package_names.intersection_update(existing_root_names)
 
     # Possible transitive dependents (equivalent to: spack dependents -t <pkg_name>)
     allowed_buildable_names = _compute_possible_transitive_dependents(selected_pkg_name)
 
+    explicit_dependent_specs = spack.cmd.parse_specs(args.dependent_spec) if args.dependent_spec else []
+    explicit_dependent_names = {spec.name for spec in explicit_dependent_specs if spec.name}
+    allowed_buildable_names.update(explicit_dependent_names)
+
+    name_only_readd_specs = []
+    if args.readd_removed_dependents:
+        removed_dep_names = {spec.name for spec in installed_dependents}
+        name_only_readd_specs = sorted(removed_dep_names - explicit_dependent_names)
+
     with env.write_transaction():
         removed = _remove_matching_roots(env, remove_package_names)
+        added_selected = _add_root_specs(env, [args.package_spec]) if selected_missing_from_roots else []
+        added_explicit = _add_root_specs(env, [str(spec) for spec in explicit_dependent_specs])
+        added_name_only = _add_root_specs(env, name_only_readd_specs)
         _set_buildability_for_allowed_packages(env, allowed_buildable_names)
 
         tty.msg(
@@ -130,6 +211,17 @@ def swap_package(parser, args):
             f"Configured buildability for {len(allowed_buildable_names)} package(s): "
             "set packages:all:buildable:false and enabled selected dependent closure."
         )
+        if added_selected or added_explicit or added_name_only:
+            tty.msg(
+                f"Added {len(added_selected) + len(added_explicit) + len(added_name_only)} root spec(s): "
+                + ", ".join(added_selected + added_explicit + added_name_only)
+            )
+
+        if args.uninstall_removed and removed:
+            uninstalled_specs = _uninstall_installed_packages_by_name(env, removed)
+            tty.msg(
+                f"Uninstalled {len(uninstalled_specs)} installed spec(s) for removed package names."
+            )
 
         if args.fresh:
             tty.msg("Running fresh concretization...")
