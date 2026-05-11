@@ -85,24 +85,23 @@ source <venv-path>/bin/activate
 The `swap-package` command updates an active environment around one selected package spec.
 
 ```console
-spack swap-package <package-spec> [--fresh] [--readd-removed-dependents] [--dependent-spec <spec> ...] [--uninstall-removed]
+spack swap-package <package-spec> [--concretize] [--dependent-spec <spec> ...] [--uninstall-removed]
 ```
 
 Behavior:
 
 1. Parses `<package-spec>` and determines the selected package name.
 2. If the selected package is not already a root in the active environment, it warns and adds it as a root spec (equivalent to `spack add <package-spec>`).
-3. Finds installed transitive dependents (equivalent to `spack dependents --transitive --installed <spec>`).
-4. Removes matching root specs from the active environment for discovered installed dependents and selected package when present as roots (equivalent behavior to `spack remove <pkg-name>` on each).
-5. Sets `packages:all:buildable:false` and enables `buildable:true` only for the selected package name and all possible transitive dependents from Spack's package graph.
-6. Optionally runs concretization with fresh reuse policy (`concretizer:reuse=false`) when `--fresh` is provided.
+3. Finds all possible transitive dependents from Spack's package graph (equivalent to `spack dependents --transitive <pkg-name>`).
+4. Removes matching root specs from the active environment for the selected package and all package-level dependents that are currently roots (equivalent behavior to `spack remove <root-spec>` on each).
+5. Re-adds the selected package with the user-specified version and all removed dependents by package name only (without version constraints), unless overridden by `--dependent-spec`.
+6. Sets `packages:all:buildable:false` and enables `buildable:true` only for the selected package name and all possible transitive dependents.
+7. Optionally runs concretization with fresh reuse policy (`concretizer:reuse=false`) when `--concretize` is provided.
 
 Useful options:
 
-1. `--readd-removed-dependents`: after removal, add discovered removed dependents back as root specs by package name only.
-2. `--dependent-spec <spec>` (repeatable): add explicit dependent root specs with version/variant control, e.g. `--dependent-spec hdf5@1.14.0 --dependent-spec netcdf-c+mpi`.
-  Explicit dependent specs take precedence over name-only re-adds.
-3. `--uninstall-removed`: uninstall installed specs that correspond to removed package roots. This is off by default.
+1. `--dependent-spec <spec>` (repeatable): re-add specific dependents with version/variant control instead of by name only, e.g. `--dependent-spec hdf5@1.14.0 --dependent-spec netcdf-c+mpi`.
+2. `--uninstall-removed`: uninstall installed specs that correspond to removed package roots. This is off by default.
 
 
 ## Environment validation

@@ -81,7 +81,6 @@ def test_swap_package_command_flow(monkeypatch, swap_package_env):
         return []
 
     monkeypatch.setattr(swap_package_env, "concretize", _fake_concretize)
-    monkeypatch.setattr(cmd.spack.cmd, "disambiguate_spec", lambda spec, _env: types.SimpleNamespace(name=spec.name))
     monkeypatch.setattr(
         cmd.spack.config,
         "override",
@@ -89,11 +88,7 @@ def test_swap_package_command_flow(monkeypatch, swap_package_env):
     )
 
     fake_parent_specs = [types.SimpleNamespace(name="hdf5"), types.SimpleNamespace(name="netcdf-c")]
-    monkeypatch.setattr(
-        cmd.spack.store.STORE.db,
-        "installed_relatives",
-        lambda selected, relation, transitive=True: fake_parent_specs,
-    )
+    monkeypatch.setattr(cmd, "_find_installed_dependents_by_package_name", lambda _env, _name: fake_parent_specs)
     monkeypatch.setattr(
         cmd,
         "_compute_possible_transitive_dependents",
@@ -106,8 +101,7 @@ def test_swap_package_command_flow(monkeypatch, swap_package_env):
 
     args = types.SimpleNamespace(
         package_spec="zlib@1.3.1",
-        fresh=True,
-        readd_removed_dependents=False,
+        concretize=True,
         dependent_spec=[],
         uninstall_removed=False,
     )
@@ -115,8 +109,10 @@ def test_swap_package_command_flow(monkeypatch, swap_package_env):
         result = cmd.swap_package(None, args)
 
     assert result == 0
-    # Selected package + installed dependents should be removed while non-dependents stay.
-    assert {spec.name for spec in swap_package_env.user_specs} == {"cmake"}
+    # Selected package and dependents are re-added (by name only); non-dependents remain.
+    assert {spec.name for spec in swap_package_env.user_specs} == {"cmake", "zlib", "hdf5", "netcdf-c"}
+    # The selected root should match the user-requested spec constraint.
+    assert any(spec.satisfies("zlib@1.3.1") for spec in swap_package_env.user_specs)
     # Global buildability gate should be closed, then selectively reopened for allowed names.
     assert swap_package_env.manifest.configuration["packages"]["all"]["buildable"] is False
     assert swap_package_env.manifest.configuration["packages"]["zlib"]["buildable"] is True
@@ -131,14 +127,8 @@ def test_swap_package_command_flow(monkeypatch, swap_package_env):
 def test_swap_package_readd_dependents_by_name_and_spec(monkeypatch, swap_package_env):
     """Re-add removed dependents by package name and allow explicit spec overrides."""
 
-    monkeypatch.setattr(cmd.spack.cmd, "disambiguate_spec", lambda spec, _env: types.SimpleNamespace(name=spec.name))
-
     fake_parent_specs = [types.SimpleNamespace(name="hdf5"), types.SimpleNamespace(name="netcdf-c")]
-    monkeypatch.setattr(
-        cmd.spack.store.STORE.db,
-        "installed_relatives",
-        lambda selected, relation, transitive=True: fake_parent_specs,
-    )
+    monkeypatch.setattr(cmd, "_find_installed_dependents_by_package_name", lambda _env, _name: fake_parent_specs)
     monkeypatch.setattr(
         cmd,
         "_compute_possible_transitive_dependents",
@@ -151,8 +141,7 @@ def test_swap_package_readd_dependents_by_name_and_spec(monkeypatch, swap_packag
 
     args = types.SimpleNamespace(
         package_spec="zlib@1.3.1",
-        fresh=False,
-        readd_removed_dependents=True,
+        concretize=False,
         dependent_spec=["hdf5@1.14.0"],
         uninstall_removed=False,
     )
@@ -162,7 +151,7 @@ def test_swap_package_readd_dependents_by_name_and_spec(monkeypatch, swap_packag
 
     assert result == 0
     user_specs_by_name = {spec.name: spec for spec in swap_package_env.user_specs}
-    assert set(user_specs_by_name) == {"cmake", "hdf5", "netcdf-c"}
+    assert set(user_specs_by_name) == {"cmake", "zlib", "hdf5", "netcdf-c"}
     assert user_specs_by_name["hdf5"].satisfies("hdf5@1.14.0")
     assert swap_package_env.manifest.configuration["packages"]["hdf5"]["buildable"] is True
     assert swap_package_env.manifest.configuration["packages"]["netcdf-c"]["buildable"] is True
@@ -171,12 +160,7 @@ def test_swap_package_readd_dependents_by_name_and_spec(monkeypatch, swap_packag
 
 def test_swap_package_adds_selected_when_missing(monkeypatch, swap_package_env):
     """If selected package is not already an environment root, command should warn and add it."""
-    monkeypatch.setattr(cmd.spack.cmd, "disambiguate_spec", lambda spec, _env: types.SimpleNamespace(name=spec.name))
-    monkeypatch.setattr(
-        cmd.spack.store.STORE.db,
-        "installed_relatives",
-        lambda selected, relation, transitive=True: [],
-    )
+    monkeypatch.setattr(cmd, "_find_installed_dependents_by_package_name", lambda _env, _name: [])
     monkeypatch.setattr(
         cmd,
         "_compute_possible_transitive_dependents",
@@ -190,8 +174,7 @@ def test_swap_package_adds_selected_when_missing(monkeypatch, swap_package_env):
 
     args = types.SimpleNamespace(
         package_spec="libpng@1.6.43",
-        fresh=False,
-        readd_removed_dependents=False,
+        concretize=False,
         dependent_spec=[],
         uninstall_removed=False,
     )
@@ -209,14 +192,8 @@ def test_swap_package_adds_selected_when_missing(monkeypatch, swap_package_env):
 
 def test_swap_package_optional_uninstall_removed(monkeypatch, swap_package_env):
     """Uninstall of removed packages should only occur when explicitly requested."""
-    monkeypatch.setattr(cmd.spack.cmd, "disambiguate_spec", lambda spec, _env: types.SimpleNamespace(name=spec.name))
-
     fake_parent_specs = [types.SimpleNamespace(name="hdf5"), types.SimpleNamespace(name="netcdf-c")]
-    monkeypatch.setattr(
-        cmd.spack.store.STORE.db,
-        "installed_relatives",
-        lambda selected, relation, transitive=True: fake_parent_specs,
-    )
+    monkeypatch.setattr(cmd, "_find_installed_dependents_by_package_name", lambda _env, _name: fake_parent_specs)
     monkeypatch.setattr(
         cmd,
         "_compute_possible_transitive_dependents",
@@ -234,8 +211,7 @@ def test_swap_package_optional_uninstall_removed(monkeypatch, swap_package_env):
 
     args = types.SimpleNamespace(
         package_spec="zlib@1.3.1",
-        fresh=False,
-        readd_removed_dependents=False,
+        concretize=False,
         dependent_spec=[],
         uninstall_removed=True,
     )
@@ -245,3 +221,106 @@ def test_swap_package_optional_uninstall_removed(monkeypatch, swap_package_env):
 
     assert result == 0
     assert uninstall_calls == [{"zlib", "hdf5", "netcdf-c"}]
+
+
+def test_swap_package_version_mismatch_uses_installed_by_name(monkeypatch, swap_package_env):
+    """Selecting gmake@4.2 should work even when gmake isn't initially in the environment."""
+
+    monkeypatch.setattr(
+        cmd.spack.cmd,
+        "disambiguate_spec",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("disambiguate_spec should not be called")),
+    )
+
+    # Mock the package-level dependent discovery
+    monkeypatch.setattr(
+        cmd,
+        "_compute_possible_transitive_dependents",
+        lambda _name: {"gmake", "autoconf"},
+    )
+
+    warns = []
+    monkeypatch.setattr(cmd.tty, "warn", lambda message: warns.append(message))
+    monkeypatch.setattr(cmd.tty, "msg", lambda _message: None)
+
+    args = types.SimpleNamespace(
+        package_spec="gmake@4.2",
+        concretize=False,
+        dependent_spec=[],
+        uninstall_removed=False,
+    )
+
+    with swap_package_env:
+        result = cmd.swap_package(None, args)
+
+    assert result == 0
+    # gmake should be added with the requested version
+    user_specs_by_name = {spec.name: spec for spec in swap_package_env.user_specs}
+    assert "gmake" in user_specs_by_name
+    assert user_specs_by_name["gmake"].satisfies("gmake@4.2")
+    assert any("not a root" in message for message in warns)
+
+
+def test_swap_package_adds_requested_spec_when_it_is_only_root(monkeypatch, tmp_path):
+    """Regression: swapping should keep the user-requested selected spec as a root."""
+    env_path = tmp_path / "swap_single_root_env"
+    env_path.mkdir(exist_ok=True)
+    env = ev.create_in_dir(env_path, with_view=False)
+    env.add("zlib@1.2")
+    env.write()
+
+    monkeypatch.setattr(cmd, "_find_installed_dependents_by_package_name", lambda _env, _name: [])
+    monkeypatch.setattr(cmd, "_compute_possible_transitive_dependents", lambda _name: {"zlib"})
+    monkeypatch.setattr(cmd.tty, "warn", lambda _message: None)
+    monkeypatch.setattr(cmd.tty, "msg", lambda _message: None)
+
+    args = types.SimpleNamespace(
+        package_spec="zlib@1.3.1",
+        concretize=False,
+        dependent_spec=[],
+        uninstall_removed=False,
+    )
+
+    with env:
+        result = cmd.swap_package(None, args)
+
+    assert result == 0
+    user_specs = list(env.user_specs)
+    # Only zlib is in the environment and it has no dependents, so it remains alone
+    assert len(user_specs) == 1
+    assert user_specs[0].name == "zlib"
+    assert user_specs[0].satisfies("zlib@1.3.1")
+
+
+def test_swap_package_readd_dependents_name_only_removes_versioned_root(monkeypatch, tmp_path):
+    """Dependent roots should be removed and re-added by name-only when requested."""
+    env_path = tmp_path / "swap_readd_name_only_env"
+    env_path.mkdir(exist_ok=True)
+    env = ev.create_in_dir(env_path, with_view=False)
+    env.add("gmake@4.4.1")
+    env.add("gmake@4.3")
+    env.add("cmake@3")
+    env.add("gcc-runtime")
+    env.write()
+
+    # Simulate no installed-dependent matches so graph-based root filtering is exercised.
+    monkeypatch.setattr(cmd, "_find_installed_dependents_by_package_name", lambda _env, _name: [])
+    monkeypatch.setattr(cmd, "_compute_possible_transitive_dependents", lambda _name: {"gmake", "cmake"})
+    monkeypatch.setattr(cmd.tty, "warn", lambda _message: None)
+    monkeypatch.setattr(cmd.tty, "msg", lambda _message: None)
+
+    args = types.SimpleNamespace(
+        package_spec="gmake@4.2",
+        concretize=False,
+        dependent_spec=[],
+        uninstall_removed=False,
+    )
+
+    with env:
+        result = cmd.swap_package(None, args)
+
+    assert result == 0
+    user_specs_by_name = {spec.name: spec for spec in env.user_specs}
+    assert set(user_specs_by_name) == {"gmake", "cmake", "gcc-runtime"}
+    assert user_specs_by_name["gmake"].satisfies("gmake@4.2")
+    assert str(user_specs_by_name["cmake"]) == "cmake"

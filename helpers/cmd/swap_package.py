@@ -32,21 +32,17 @@ def setup_parser(subparser):
         help="package spec to swap to (e.g., hdf5@1.14.6)"
     )
     subparser.add_argument(
-        "--fresh",
+        "--concretize",
         action="store_true",
         help="run concretization after updates (equivalent to 'spack concretize --fresh')"
-    )
-    subparser.add_argument(
-        "--readd-removed-dependents",
-        action="store_true",
-        help="re-add removed dependents to the environment by package name only"
     )
     subparser.add_argument(
         "--dependent-spec",
         action="append",
         default=[],
         metavar="SPEC",
-        help="explicit dependent spec to add back (repeatable, supports versions/variants)"
+        help="explicit dependent spec to add back with version/variant constraints (repeatable); "
+             "by default dependents are re-added by package name only"
     )
     subparser.add_argument(
         "--uninstall-removed",
@@ -87,16 +83,17 @@ def _set_buildability_for_allowed_packages(env, allowed_pkg_names):
 
 
 def _remove_matching_roots(env, package_names):
-    """Best-effort removal of matching root specs from the active environment."""
-    removed_names = []
+    """Remove all root specs whose package name matches any in the provided set."""
+    removed_specs = []
 
-    for pkg_name in sorted(package_names):
-        query_spec = spack.spec.Spec(pkg_name)
+    # Iterate over actual root specs and remove those with matching package names.
+    # This ensures versioned roots like "cmake@3" are removed when "cmake" is in package_names.
+    for root_spec in list(env.user_specs):
+        if root_spec.name in package_names:
+            env.remove(root_spec, force=True)
+            removed_specs.append(str(root_spec))
 
-        env.remove(query_spec, force=True)
-        removed_names.append(pkg_name)
-
-    return removed_names
+    return removed_specs
 
 
 def _add_root_specs(env, spec_strings):
@@ -140,6 +137,28 @@ def _uninstall_installed_packages_by_name(env, package_names):
     return specs_to_uninstall
 
 
+def _find_installed_dependents_by_package_name(env, package_name):
+    """Return installed transitive dependents for any installed spec of package_name."""
+    installed_specs = _find_installed_specs_for_package_names(env, {package_name})
+    dependents = []
+    seen_hashes = set()
+
+    for installed_spec in installed_specs:
+        relatives = spack.store.STORE.db.installed_relatives(
+            installed_spec,
+            "parents",
+            transitive=True,
+        )
+        for spec in relatives:
+            dag_hash = spec.dag_hash()
+            if dag_hash in seen_hashes:
+                continue
+            seen_hashes.add(dag_hash)
+            dependents.append(spec)
+
+    return dependents
+
+
 def swap_package(parser, args):
     """Handle swap-package command."""
     env = ev.active_environment()
@@ -163,42 +182,31 @@ def swap_package(parser, args):
             "adding it as a root spec."
         )
 
-    # Installed transitive dependents (equivalent to: spack dependents -t -i <spec>)
-    installed_dependents = []
-    try:
-        selected_installed = spack.cmd.disambiguate_spec(selected_query, env)
-        installed_dependents = list(
-            spack.store.STORE.db.installed_relatives(
-                selected_installed,
-                "parents",
-                transitive=True,
-            )
-        )
-    except Exception as exc:
-        tty.warn(
-            f"Could not resolve installed spec for '{args.package_spec}': {exc}. "
-            "Continuing with buildability updates."
-        )
-
-    remove_package_names = {selected_pkg_name}
-    remove_package_names.update(spec.name for spec in installed_dependents)
-    remove_package_names.intersection_update(existing_root_names)
-
     # Possible transitive dependents (equivalent to: spack dependents -t <pkg_name>)
+    # This uses package-level dependency information, not installed specs.
     allowed_buildable_names = _compute_possible_transitive_dependents(selected_pkg_name)
 
     explicit_dependent_specs = spack.cmd.parse_specs(args.dependent_spec) if args.dependent_spec else []
     explicit_dependent_names = {spec.name for spec in explicit_dependent_specs if spec.name}
     allowed_buildable_names.update(explicit_dependent_names)
 
-    name_only_readd_specs = []
-    if args.readd_removed_dependents:
-        removed_dep_names = {spec.name for spec in installed_dependents}
-        name_only_readd_specs = sorted(removed_dep_names - explicit_dependent_names)
+    # Always remove all package-level dependents that are currently roots
+    # and re-add them (by name only unless explicit spec provided).
+    remove_package_names = allowed_buildable_names.intersection(existing_root_names)
+    
+    # Re-add dependents (excluding selected package) by name only, except those with explicit specs
+    dependent_names_to_readd = (allowed_buildable_names - {selected_pkg_name}).intersection(existing_root_names)
+    name_only_readd_specs = sorted(dependent_names_to_readd - explicit_dependent_names)
+
+    # If uninstall requested, find installed specs BEFORE removing them from environment
+    specs_to_uninstall = []
+    if args.uninstall_removed:
+        specs_to_uninstall = _find_installed_specs_for_package_names(env, remove_package_names)
 
     with env.write_transaction():
         removed = _remove_matching_roots(env, remove_package_names)
-        added_selected = _add_root_specs(env, [args.package_spec]) if selected_missing_from_roots else []
+        # Always add the selected spec with user-provided version after removals
+        added_selected = _add_root_specs(env, [args.package_spec])
         added_explicit = _add_root_specs(env, [str(spec) for spec in explicit_dependent_specs])
         added_name_only = _add_root_specs(env, name_only_readd_specs)
         _set_buildability_for_allowed_packages(env, allowed_buildable_names)
@@ -217,17 +225,22 @@ def swap_package(parser, args):
                 + ", ".join(added_selected + added_explicit + added_name_only)
             )
 
-        if args.uninstall_removed and removed:
-            uninstalled_specs = _uninstall_installed_packages_by_name(env, removed)
+        env.write()
+
+        if args.uninstall_removed and specs_to_uninstall:
+            uninstall_cmd.do_uninstall(specs_to_uninstall, force=True)
             tty.msg(
-                f"Uninstalled {len(uninstalled_specs)} installed spec(s) for removed package names."
+                f"Uninstalled {len(specs_to_uninstall)} installed spec(s) for removed package names."
             )
 
-        if args.fresh:
+        if args.concretize:
             tty.msg("Running fresh concretization...")
             with spack.config.override("concretizer:reuse", False):
-                env.concretize()
-
-        env.write()
+                concretized_specs = env.concretize()
+                if concretized_specs:
+                    tty.msg(f"Concretized {len(concretized_specs)} spec{'s' if len(concretized_specs) != 1 else ''}:")
+                    ev.display_specs([concrete for _, concrete in concretized_specs])
+                else:
+                    tty.msg("No new specs to concretize.")
 
     return 0
