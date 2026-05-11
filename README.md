@@ -81,6 +81,22 @@ source <venv-path>/bin/activate
 ```
 
 
+## Swap package policy and roots: swap-package
+The `swap-package` command updates an active environment around one selected package spec.
+
+```console
+spack swap-package <package-spec> [--fresh]
+```
+
+Behavior:
+
+1. Parses `<package-spec>` and determines the selected package name.
+2. Finds installed transitive dependents (equivalent to `spack dependents --transitive --installed <spec>`).
+3. Removes matching root specs from the active environment for the selected package name and discovered installed dependents (equivalent behavior to `spack remove <pkg-name>` on each).
+4. Sets `packages:all:buildable:false` and enables `buildable:true` only for the selected package name and all possible transitive dependents from Spack's package graph.
+5. Optionally runs concretization with fresh reuse policy (`concretizer:reuse=false`) when `--fresh` is provided.
+
+
 ## Environment validation
 > [!IMPORTANT]
 > All of the following commands must be run in an active, concretized environment. Unconcretized root specs will not be accounted for.
