@@ -217,7 +217,7 @@ def swap_package(parser, args):
         )
         tty.msg(
             f"Configured buildability for {len(allowed_buildable_names)} package(s): "
-            "set packages:all:buildable:false and enabled selected dependent closure."
+            "with default unbuildable (packages:all:buildable:false)"
         )
         if added_selected or added_explicit or added_name_only:
             tty.msg(
