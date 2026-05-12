@@ -234,6 +234,7 @@ def swap_package(parser, args):
             with spack.config.override("concretizer:reuse", False):
                 concretized_specs = env.concretize()
                 if concretized_specs:
+                    env.write()
                     tty.msg(f"Concretized {len(concretized_specs)} spec{'s' if len(concretized_specs) != 1 else ''}:")
                     ev.display_specs([concrete for _, concrete in concretized_specs])
                 else:
