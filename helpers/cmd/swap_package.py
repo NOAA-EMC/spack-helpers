@@ -198,11 +198,6 @@ def swap_package(parser, args):
     dependent_names_to_readd = (allowed_buildable_names - {selected_pkg_name}).intersection(existing_root_names)
     name_only_readd_specs = sorted(dependent_names_to_readd - explicit_dependent_names)
 
-    # If uninstall requested, find installed specs BEFORE removing them from environment
-    specs_to_uninstall = []
-    if args.uninstall_removed:
-        specs_to_uninstall = _find_installed_specs_for_package_names(env, remove_package_names)
-
     with env.write_transaction():
         removed = _remove_matching_roots(env, remove_package_names)
         # Always add the selected spec with user-provided version after removals
@@ -227,11 +222,12 @@ def swap_package(parser, args):
 
         env.write()
 
-        if args.uninstall_removed and specs_to_uninstall:
-            uninstall_cmd.do_uninstall(specs_to_uninstall, force=True)
-            tty.msg(
-                f"Uninstalled {len(specs_to_uninstall)} installed spec(s) for removed package names."
-            )
+        if args.uninstall_removed:
+            uninstalled_specs = _uninstall_installed_packages_by_name(env, remove_package_names)
+            if uninstalled_specs:
+                tty.msg(
+                    f"Uninstalled {len(uninstalled_specs)} installed spec(s) for removed package names."
+                )
 
         if args.concretize:
             tty.msg("Running fresh concretization...")
