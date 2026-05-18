@@ -16,7 +16,7 @@ runs:
   steps:
     - name: Install Spack
       if: inputs.install-spack == 'true'
-      uses: spack/setup-spack@v2
+      uses: spack/setup-spack@eb0523e3b331d170d917083e9df79e1f11b29b0e
       with:
         ref: ${{ inputs.spack-ref }}
     
