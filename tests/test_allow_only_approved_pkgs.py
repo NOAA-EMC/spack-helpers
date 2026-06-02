@@ -4,9 +4,15 @@ import pytest
 import spack.environment as ev
 import spack.spec
 import spack.extensions
+from spack.error import SpackError
 
 # Load the helpers extension
 spack.extensions.load_extension("helpers")
+from spack.extensions.helpers.cmd import allow_only_approved_pkgs as cmd
+from spack.extensions.helpers.allow_only_approved_packages import (
+    allow_only_approved_packages,
+    read_approved_packages_from_file,
+)
 
 
 @pytest.fixture
@@ -21,140 +27,170 @@ def test_env(tmp_path):
     return env
 
 
-def test_allow_only_approved_pkgs_basic(test_env):
-    """Test basic functionality of allowing approved packages."""
-    # Import the command module
-    from spack.extensions.helpers.cmd import allow_only_approved_pkgs
-    
-    # Create mock args
+@pytest.fixture
+def mock_args():
+    """Factory for creating mock Args objects."""
     class Args:
-        packages = ['gcc', 'openmpi', 'hdf5']
-        pkgs_from_file = None
-    
-    args = Args()
-    
-    # Activate environment and run the command
-    with test_env:
-        result = allow_only_approved_pkgs.allow_only_approved_pkgs(None, args)
-    
-    # Check return code
-    assert result == 0
-    
-    # Verify configuration was written
-    packages = test_env.manifest.configuration.get('packages', {})
-    
-    # Check that approved packages are buildable
-    assert packages['gcc']['buildable'] is True
-    assert packages['openmpi']['buildable'] is True
-    assert packages['hdf5']['buildable'] is True
-    
-    # Check that 'all' is non-buildable
-    assert packages['all']['buildable'] is False
+        def __init__(self, packages=None, pkgs_from_file=None):
+            self.packages = packages
+            self.pkgs_from_file = pkgs_from_file
+    return Args
 
 
-def test_allow_only_approved_pkgs_preserves_existing_false(test_env):
-    """Test that packages already marked buildable:false are not changed."""
-    # Pre-configure a package as buildable:false
-    test_env.manifest.configuration['packages'] = {
-        'cmake': {'buildable': False}
-    }
-    test_env.write()
-    
-    from spack.extensions.helpers.cmd import allow_only_approved_pkgs
-    
-    class Args:
-        packages = ['gcc', 'cmake', 'openmpi']
-        pkgs_from_file = None
-    
-    args = Args()
-    
-    # Activate environment and run the command
-    with test_env:
-        result = allow_only_approved_pkgs.allow_only_approved_pkgs(None, args)
-    
-    assert result == 0
-    
-    packages = test_env.manifest.configuration.get('packages', {})
-    
-    # cmake should still be False (unchanged)
-    assert packages['cmake']['buildable'] is False
-    
-    # Other packages should be True
-    assert packages['gcc']['buildable'] is True
-    assert packages['openmpi']['buildable'] is True
-    
-    # 'all' should be False
-    assert packages['all']['buildable'] is False
-
-
-def test_allow_only_approved_pkgs_from_file(test_env, tmp_path):
-    """Test reading approved packages from a file."""
-    # Create a package list file
-    pkg_file = tmp_path / "packages.txt"
-    pkg_file.write_text("gcc\nopenmpi\n# comment line\nhdf5\n\n")
-    
-    from spack.extensions.helpers.cmd import allow_only_approved_pkgs
-    
-    class Args:
-        packages = []
-        pkgs_from_file = str(pkg_file)
-    
-    args = Args()
-    
-    # Activate environment and run the command
-    with test_env:
-        result = allow_only_approved_pkgs.allow_only_approved_pkgs(None, args)
-    
-    assert result == 0
-    
-    packages = test_env.manifest.configuration.get('packages', {})
-    
-    # Check that packages from file are buildable
-    assert packages['gcc']['buildable'] is True
-    assert packages['openmpi']['buildable'] is True
-    assert packages['hdf5']['buildable'] is True
-    
-    # 'all' should be False
-    assert packages['all']['buildable'] is False
-
-
-def test_allow_only_approved_pkgs_preserves_other_config(test_env):
-    """Test that other package configuration is preserved."""
-    # Pre-configure packages with various settings
+@pytest.fixture
+def preconfigured_env(test_env):
+    """Environment with pre-existing package configuration."""
     test_env.manifest.configuration['packages'] = {
         'gcc': {
             'variants': '+binutils',
             'externals': [{'spec': 'gcc@11.2.0', 'prefix': '/usr'}]
         },
+        'cmake': {
+            'buildable': False
+        },
         'openmpi': {
             'version': ['4.1.0'],
-            'buildable': False
         }
     }
     test_env.write()
+    return test_env
+
+
+@pytest.mark.parametrize('packages,expected_buildable_pkgs', [
+    (['gcc'], ['gcc']),
+    (['gcc', 'cmake'], ['gcc', 'cmake']),
+    (['gcc', 'openmpi', 'hdf5'], ['gcc', 'openmpi', 'hdf5']),
+])
+def test_allow_only_approved_pkgs_basic(test_env, mock_args, packages, expected_buildable_pkgs):
+    """Test basic functionality with various package counts."""
+    args = mock_args(packages=packages)
     
-    from spack.extensions.helpers.cmd import allow_only_approved_pkgs
-    
-    class Args:
-        packages = ['gcc', 'openmpi']
-        pkgs_from_file = None
-    
-    args = Args()
-    
-    # Activate environment and run the command
     with test_env:
-        result = allow_only_approved_pkgs.allow_only_approved_pkgs(None, args)
+        result = cmd.allow_only_approved_pkgs(None, args)
     
     assert result == 0
     
-    packages = test_env.manifest.configuration.get('packages', {})
+    env_packages = test_env.manifest.configuration.get('packages', {})
     
-    # Check that gcc's other config is preserved
-    assert packages['gcc']['variants'] == '+binutils'
-    assert packages['gcc']['externals'][0]['spec'] == 'gcc@11.2.0'
-    assert packages['gcc']['buildable'] is True
+    # Verify approved packages are buildable
+    for pkg in expected_buildable_pkgs:
+        assert env_packages[pkg]['buildable'] is True
     
-    # Check that openmpi's buildable:false is preserved
-    assert packages['openmpi']['version'] == ['4.1.0']
-    assert packages['openmpi']['buildable'] is False
+    # Verify 'all' is non-buildable
+    assert env_packages['all']['buildable'] is False
+
+
+def test_allow_only_approved_pkgs_skips_already_false(test_env, mock_args):
+    """Test that packages marked buildable:false are not changed to true."""
+    # Pre-configure cmake as buildable:false
+    test_env.manifest.configuration['packages'] = {
+        'cmake': {'buildable': False}
+    }
+    test_env.write()
+    
+    args = mock_args(packages=['gcc', 'cmake', 'openmpi'])
+    
+    with test_env:
+        result = cmd.allow_only_approved_pkgs(None, args)
+    
+    assert result == 0
+    
+    env_packages = test_env.manifest.configuration.get('packages', {})
+    
+    # cmake should remain False (unchanged)
+    assert env_packages['cmake']['buildable'] is False
+    
+    # Other packages should be True
+    assert env_packages['gcc']['buildable'] is True
+    assert env_packages['openmpi']['buildable'] is True
+    
+    # 'all' should be False
+    assert env_packages['all']['buildable'] is False
+
+
+def test_allow_only_approved_pkgs_preserves_other_config(preconfigured_env, mock_args):
+    """Test that existing package configuration (variants, externals, etc.) is preserved."""
+    args = mock_args(packages=['gcc', 'openmpi'])
+    
+    with preconfigured_env:
+        result = cmd.allow_only_approved_pkgs(None, args)
+    
+    assert result == 0
+    
+    env_packages = preconfigured_env.manifest.configuration.get('packages', {})
+    
+    # Check gcc's other config is preserved
+    assert env_packages['gcc']['variants'] == '+binutils'
+    assert env_packages['gcc']['externals'][0]['spec'] == 'gcc@11.2.0'
+    assert env_packages['gcc']['buildable'] is True
+    
+    # Check openmpi's version is preserved (not buildable:false, so gets set to True)
+    assert env_packages['openmpi']['version'] == ['4.1.0']
+    assert env_packages['openmpi']['buildable'] is True
+    
+    # cmake (not approved) should remain buildable:false
+    assert env_packages['cmake']['buildable'] is False
+
+
+def test_read_approved_packages_from_file(tmp_path):
+    """Test reading package list from file with comments and empty lines."""
+    pkg_file = tmp_path / "packages.txt"
+    pkg_file.write_text("gcc\n# comment line\nopenmpi\n\nhdf5\n\n# another comment\n")
+    
+    result = read_approved_packages_from_file(str(pkg_file))
+    
+    assert result == ['gcc', 'openmpi', 'hdf5']
+
+
+def test_read_approved_packages_from_file_empty(tmp_path):
+    """Test reading file with only comments and empty lines returns empty list."""
+    pkg_file = tmp_path / "packages.txt"
+    pkg_file.write_text("# comment\n\n# another comment\n")
+    
+    result = read_approved_packages_from_file(str(pkg_file))
+    
+    assert result == []
+
+
+def test_read_approved_packages_from_file_not_found():
+    """Test reading from non-existent file raises SpackError."""
+    with pytest.raises(SpackError, match="Could not read package list"):
+        read_approved_packages_from_file("/nonexistent/path/packages.txt")
+
+
+def test_allow_only_approved_pkgs_from_file_via_command(test_env, mock_args, tmp_path):
+    """Test command-level functionality with --pkgs-from-file option."""
+    pkg_file = tmp_path / "packages.txt"
+    pkg_file.write_text("gcc\nopenmpi\nhdf5\n")
+    
+    args = mock_args(packages=None, pkgs_from_file=str(pkg_file))
+    
+    with test_env:
+        result = cmd.allow_only_approved_pkgs(None, args)
+    
+    assert result == 0
+    
+    env_packages = test_env.manifest.configuration.get('packages', {})
+    
+    # Check packages from file are buildable
+    for pkg in ['gcc', 'openmpi', 'hdf5']:
+        assert env_packages[pkg]['buildable'] is True
+    
+    # 'all' should be False
+    assert env_packages['all']['buildable'] is False
+
+
+def test_allow_only_approved_packages_empty_list_raises(test_env):
+    """Test that calling with empty package list raises SpackError."""
+    with pytest.raises(SpackError, match="No approved packages specified"):
+        allow_only_approved_packages(test_env, [])
+
+
+def test_allow_only_approved_packages_returns_configured_count(preconfigured_env):
+    """Test that configured_count reflects only newly configured packages."""
+    # cmake is already buildable:false, so it should not count
+    result = allow_only_approved_packages(preconfigured_env, ['gcc', 'cmake', 'openmpi'])
+    
+    # Only gcc and openmpi should be counted (cmake was already buildable:false)
+    assert result == 2
 

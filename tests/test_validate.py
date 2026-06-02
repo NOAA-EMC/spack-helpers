@@ -2,9 +2,9 @@
 import copy
 import pytest
 
+import spack.config
 import spack.environment as ev
 import spack.spec
-import spack.spec as spec_module
 import spack.extensions
 
 # Load the helpers extension
@@ -111,11 +111,9 @@ def test_check_duplicate_packages_no_false_positives(validation_test_env):
     
     duplicates = check_duplicate_packages(env)
     
-    # Packages like libelf, libdwarf should not be flagged as duplicates
-    # (they were only added once)
+    # Packages added only once should never appear as duplicates.
     for pkg in ["libelf", "libdwarf"]:
-        if pkg in duplicates:
-            assert len(duplicates[pkg]) > 1, f"{pkg} should only be flagged if truly duplicated"
+        assert pkg not in duplicates, f"{pkg} should not be flagged as a duplicate"
 
 
 def test_check_duplicate_packages_includes_dependencies(validation_test_env):
@@ -206,30 +204,6 @@ def test_check_allowed_compilers_detects_violations(validation_test_env):
     # Should find specs using compilers other than gcc@999.0.0
     assert len(illegal_specs) > 0, "Should detect specs using disallowed compilers"
 
-
-def test_check_allowed_compilers_with_wildcard(validation_test_env):
-    """Test that check_allowed_compilers works with compiler version wildcards."""
-    env = validation_test_env
-    
-    # Allow any gcc version
-    allowed_compilers = ["gcc"]
-    illegal_specs = check_allowed_compilers(env, allowed_compilers)
-    
-    # Should find few or no violations (most specs use gcc in our test env)
-    # The exact count depends on mock packages, but we can verify the function runs
-    assert isinstance(illegal_specs, list), "Should return a list"
-
-
-def test_check_allowed_compilers_multiple_allowed(validation_test_env):
-    """Test check_allowed_compilers with multiple allowed compilers."""
-    env = validation_test_env
-    
-    # Allow both gcc and intel compilers (with any version)
-    allowed_compilers = ["gcc", "intel-oneapi-compilers"]
-    illegal_specs = check_allowed_compilers(env, allowed_compilers)
-    
-    # Should allow specs using either compiler
-    assert isinstance(illegal_specs, list), "Should return a list"
 
 
 def test_check_approved_packages_detects_violations(validation_test_env):

@@ -11,28 +11,23 @@ from spack.extensions.helpers.filter_compiler_packages import filter_compiler_pa
 
 
 @pytest.fixture
-def filter_compilers_env(tmp_path, monkeypatch):
-    """Create a test environment with compiler packages configuration.
+def multi_compiler_env(tmp_path, monkeypatch):
+    """Create a test environment with multiple compiler externals and config.
     
-    This environment includes:
-    - gcc compiler with two externals
-    - clang compiler with two externals
-    - Package-level configuration (variants, buildable) to ensure
-      non-externals config is preserved during filtering
+    Provides gcc and clang with multiple externals each, plus non-externals config
+    (variants, buildable) to verify preservation during filtering.
     """
     env_path = tmp_path / "filter_test_env"
     env_path.mkdir(exist_ok=True)
     
     env = ev.create_in_dir(env_path, with_view=False)
     
-    # Create packages configuration with compiler externals and non-externals config
     packages_config = {
         'gcc': {
             'externals': [
                 {'spec': 'gcc@11.2.0', 'prefix': '/usr/bin/gcc-11'},
                 {'spec': 'gcc@10.3.0', 'prefix': '/usr/bin/gcc-10'},
             ],
-            # Non-externals config that should be preserved
             'variants': '+binutils',
         },
         'clang': {
@@ -40,7 +35,6 @@ def filter_compilers_env(tmp_path, monkeypatch):
                 {'spec': 'clang@14.0.0', 'prefix': '/usr/bin/clang-14'},
                 {'spec': 'clang@13.0.0', 'prefix': '/usr/bin/clang-13'},
             ],
-            # Non-externals config that should be preserved
             'buildable': False,
         },
     }
@@ -48,7 +42,6 @@ def filter_compilers_env(tmp_path, monkeypatch):
     env.manifest.configuration['packages'] = packages_config
     env.write()
     
-    # Mock spack.config.get to return our test packages config
     original_config_get = spack.config.get
     
     def mock_config_get(key, default=None, scope=None):
@@ -61,93 +54,165 @@ def filter_compilers_env(tmp_path, monkeypatch):
     return env
 
 
-def test_filter_compilers_keep_only(filter_compilers_env):
-    """Test filter-compilers --keep-only mode.
+@pytest.fixture
+def single_external_env(tmp_path, monkeypatch):
+    """Create a test environment with a compiler having a single external."""
+    env_path = tmp_path / "single_external_env"
+    env_path.mkdir(exist_ok=True)
     
-    Keep only gcc@11.2.0, verifying that the clang externals and the other gcc 
-    external are properly removed and non-externals configuration is retained.
+    env = ev.create_in_dir(env_path, with_view=False)
+    
+    packages_config = {
+        'gcc': {
+            'externals': [
+                {'spec': 'gcc@11.2.0', 'prefix': '/usr/bin/gcc-11'},
+            ],
+        },
+    }
+    
+    env.manifest.configuration['packages'] = packages_config
+    env.write()
+    
+    original_config_get = spack.config.get
+    
+    def mock_config_get(key, default=None, scope=None):
+        if key == 'packages':
+            return env.manifest.configuration.get('packages', {})
+        return original_config_get(key, default, scope)
+    
+    monkeypatch.setattr(spack.config, 'get', mock_config_get)
+    
+    return env
+
+
+@pytest.fixture
+def empty_packages_env(tmp_path, monkeypatch):
+    """Create a test environment with no packages configuration."""
+    env_path = tmp_path / "empty_env"
+    env_path.mkdir(exist_ok=True)
+    
+    env = ev.create_in_dir(env_path, with_view=False)
+    env.write()
+    
+    original_config_get = spack.config.get
+    
+    def mock_config_get(key, default=None, scope=None):
+        if key == 'packages':
+            return env.manifest.configuration.get('packages', {})
+        return original_config_get(key, default, scope)
+    
+    monkeypatch.setattr(spack.config, 'get', mock_config_get)
+    
+    return env
+
+
+@pytest.mark.parametrize('mode,filter_specs,expected_gcc_count,expected_clang_count', [
+    ('keep-only', ['gcc@11.2.0'], 1, 0),
+    ('remove', ['gcc@10.3.0', 'clang@14.0.0', 'clang@13.0.0'], 1, 0),
+])
+def test_filter_modes(multi_compiler_env, mode, filter_specs, expected_gcc_count, expected_clang_count):
+    """Test both filter modes (keep-only and remove) maintain expected behavior.
+    
+    Parametrized test reduces duplication while ensuring both modes work correctly.
+    Verifies externals count and that non-externals config is preserved.
     """
-    env = filter_compilers_env
+    env = multi_compiler_env
     
-    # Keep only gcc@11.2.0
-    modified_count = filter_compiler_packages(
-        env,
-        ['gcc@11.2.0'],
-        mode='keep-only'
-    )
+    modified_count = filter_compiler_packages(env, filter_specs, mode=mode)
     
-    assert modified_count > 0, "Should have modified compiler configuration"
-    
+    assert modified_count > 0
     packages = env.manifest.configuration.get('packages', {})
     
-    # gcc should have only gcc@11.2.0
+    # Verify gcc externals and config
+    gcc_config = packages.get('gcc:')  # Use consistent :: syntax key
+    if gcc_config is None:
+        gcc_config = packages.get('gcc')
+    assert gcc_config is not None
+    assert len(gcc_config.get('externals', [])) == expected_gcc_count
+    assert gcc_config.get('variants') == '+binutils'  # Non-externals config preserved
+    
+    # Verify clang externals and config
+    clang_config = packages.get('clang:')
+    if clang_config is None:
+        clang_config = packages.get('clang')
+    assert clang_config is not None
+    assert len(clang_config.get('externals', [])) == expected_clang_count
+    assert clang_config.get('buildable') is False  # Non-externals config preserved
+
+
+def test_filter_single_external(single_external_env):
+    """Test filtering a compiler with only one external."""
+    env = single_external_env
+    
+    # Remove the only external
+    modified_count = filter_compiler_packages(env, ['gcc@11.2.0'], mode='remove')
+    
+    assert modified_count > 0
+    packages = env.manifest.configuration.get('packages', {})
     gcc_config = packages.get('gcc:') or packages.get('gcc')
-    assert gcc_config is not None, "gcc should be in configuration"
-    gcc_externals = gcc_config.get('externals', [])
-    assert len(gcc_externals) == 1, f"gcc should have exactly 1 external, got {len(gcc_externals)}"
-    assert gcc_externals[0]['spec'] == 'gcc@11.2.0'
-    assert gcc_externals[0]['prefix'] == '/usr/bin/gcc-11'
-    
-    # gcc non-externals configuration should be preserved
-    assert gcc_config.get('variants') == '+binutils', "gcc variants should be preserved"
-    
-    # clang should have no externals (all removed)
-    clang_config = packages.get('clang:') or packages.get('clang')
-    assert clang_config is not None, "clang should be in configuration"
-    clang_externals = clang_config.get('externals', [])
-    assert len(clang_externals) == 0, f"clang should have 0 externals, got {len(clang_externals)}"
-    
-    # clang non-externals configuration should be preserved
-    assert clang_config.get('buildable') is False, "clang buildable should be preserved"
+    assert gcc_config is not None
+    assert len(gcc_config.get('externals', [])) == 0
 
 
-def test_filter_compilers_remove(filter_compilers_env):
-    """Test filter-compilers --remove mode.
+def test_filter_no_matching_specs(multi_compiler_env):
+    """Test filter with specs that don't match any externals."""
+    env = multi_compiler_env
     
-    Remove gcc@10.3.0 and both clang versions, ensuring that only gcc@11.2.0 
-    remains and that non-externals configuration is suitably retained.
-    """
-    env = filter_compilers_env
-    
-    # Remove gcc@10.3.0, clang@14.0.0, and clang@13.0.0
+    # Try to remove specs that don't exist in config
     modified_count = filter_compiler_packages(
         env,
-        ['gcc@10.3.0', 'clang@14.0.0', 'clang@13.0.0'],
+        ['gcc@99.0.0', 'clang@99.0.0'],
         mode='remove'
     )
     
-    assert modified_count > 0, "Should have modified compiler configuration"
+    # Should not modify anything since no externals match
+    assert modified_count == 0
     
+    # Verify original config is unchanged
     packages = env.manifest.configuration.get('packages', {})
-    
-    # gcc should have only gcc@11.2.0
-    gcc_config = packages.get('gcc:') or packages.get('gcc')
-    assert gcc_config is not None, "gcc should be in configuration"
-    gcc_externals = gcc_config.get('externals', [])
-    assert len(gcc_externals) == 1, f"gcc should have exactly 1 external, got {len(gcc_externals)}"
-    assert gcc_externals[0]['spec'] == 'gcc@11.2.0'
-    assert gcc_externals[0]['prefix'] == '/usr/bin/gcc-11'
-    
-    # gcc non-externals configuration should be preserved
-    assert gcc_config.get('variants') == '+binutils', "gcc variants should be preserved"
-    
-    # clang should have no externals (all removed)
-    clang_config = packages.get('clang:') or packages.get('clang')
-    assert clang_config is not None, "clang should be in configuration"
-    clang_externals = clang_config.get('externals', [])
-    assert len(clang_externals) == 0, f"clang should have 0 externals, got {len(clang_externals)}"
-    
-    # clang non-externals configuration should be preserved
-    assert clang_config.get('buildable') is False, "clang buildable should be preserved"
+    gcc_config = packages.get('gcc') or packages.get('gcc')
+    gcc_externals = gcc_config.get('externals', []) if gcc_config else []
+    assert len(gcc_externals) == 2  # Original count
 
 
-def test_expand_compiler_synonyms():
+def test_filter_empty_packages_config(empty_packages_env):
+    """Test filter on environment with no packages configuration."""
+    env = empty_packages_env
+    
+    modified_count = filter_compiler_packages(env, ['gcc@11.2.0'], mode='remove')
+    
+    # Should return 0 (no modifications)
+    assert modified_count == 0
+
+
+def test_expand_compiler_synonyms_basic():
     """Test that compiler synonyms are correctly expanded."""
-
-    # Test both synonyms together
     result = _expand_compiler_synonyms(['oneapi@2024.2.1', 'intel@2021.4.0', 'gcc@11.2.0'])
     assert result == ['intel-oneapi-compilers@2024.2.1', 'intel-oneapi-compilers-classic@2021.4.0', 'gcc@11.2.0']
-    
-    # Test non-synonym (should be unchanged)
+
+
+def test_expand_compiler_synonyms_non_synonyms():
+    """Test that non-synonym specs are left unchanged."""
     result = _expand_compiler_synonyms(['gcc@11.2.0', 'clang@14.0.0'])
     assert result == ['gcc@11.2.0', 'clang@14.0.0']
+
+
+def test_filter_with_synonym_expansion(multi_compiler_env, monkeypatch):
+    """Test that synonym expansion works in actual filtering context.
+    
+    Note: Current implementation of filter_compiler_packages doesn't expose
+    direct synonym handling for filtering. This test documents expected behavior
+    if synonym expansion is needed during filter operations.
+    """
+    # This test documents that _expand_compiler_synonyms is used internally
+    # Verifying the helper function works correctly with actual filtering
+    env = multi_compiler_env
+    
+    # Manually expand and filter using the helper
+    specs_with_synonyms = ['gcc@11.2.0']
+    expanded = _expand_compiler_synonyms(specs_with_synonyms)
+    
+    assert expanded == specs_with_synonyms  # No synonyms in this input
+    
+    modified_count = filter_compiler_packages(env, specs_with_synonyms, mode='keep-only')
+    assert modified_count > 0

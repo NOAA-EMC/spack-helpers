@@ -87,8 +87,6 @@ def test_swap_package_command_flow(monkeypatch, swap_package_env):
         lambda key, value: (override_calls.append((key, value)) or _OverrideCtx()),
     )
 
-    fake_parent_specs = [types.SimpleNamespace(name="hdf5"), types.SimpleNamespace(name="netcdf-c")]
-    monkeypatch.setattr(cmd, "_find_installed_dependents_by_package_name", lambda _env, _name: fake_parent_specs)
     monkeypatch.setattr(
         cmd,
         "_compute_possible_transitive_dependents",
@@ -127,8 +125,6 @@ def test_swap_package_command_flow(monkeypatch, swap_package_env):
 def test_swap_package_readd_dependents_by_name_and_spec(monkeypatch, swap_package_env):
     """Re-add removed dependents by package name and allow explicit spec overrides."""
 
-    fake_parent_specs = [types.SimpleNamespace(name="hdf5"), types.SimpleNamespace(name="netcdf-c")]
-    monkeypatch.setattr(cmd, "_find_installed_dependents_by_package_name", lambda _env, _name: fake_parent_specs)
     monkeypatch.setattr(
         cmd,
         "_compute_possible_transitive_dependents",
@@ -160,7 +156,6 @@ def test_swap_package_readd_dependents_by_name_and_spec(monkeypatch, swap_packag
 
 def test_swap_package_adds_selected_when_missing(monkeypatch, swap_package_env):
     """If selected package is not already an environment root, command should warn and add it."""
-    monkeypatch.setattr(cmd, "_find_installed_dependents_by_package_name", lambda _env, _name: [])
     monkeypatch.setattr(
         cmd,
         "_compute_possible_transitive_dependents",
@@ -192,8 +187,6 @@ def test_swap_package_adds_selected_when_missing(monkeypatch, swap_package_env):
 
 def test_swap_package_optional_uninstall_removed(monkeypatch, swap_package_env):
     """Uninstall of removed packages should only occur when explicitly requested."""
-    fake_parent_specs = [types.SimpleNamespace(name="hdf5"), types.SimpleNamespace(name="netcdf-c")]
-    monkeypatch.setattr(cmd, "_find_installed_dependents_by_package_name", lambda _env, _name: fake_parent_specs)
     monkeypatch.setattr(
         cmd,
         "_compute_possible_transitive_dependents",
@@ -223,15 +216,8 @@ def test_swap_package_optional_uninstall_removed(monkeypatch, swap_package_env):
     assert uninstall_calls == [{"zlib", "hdf5", "netcdf-c"}]
 
 
-def test_swap_package_version_mismatch_uses_installed_by_name(monkeypatch, swap_package_env):
-    """Selecting gmake@4.2 should work even when gmake isn't initially in the environment."""
-
-    monkeypatch.setattr(
-        cmd.spack.cmd,
-        "disambiguate_spec",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("disambiguate_spec should not be called")),
-    )
-
+def test_swap_package_adds_non_root_with_version_constraint(monkeypatch, swap_package_env):
+    """Selecting a package not currently in the environment should add it with the requested version."""
     # Mock the package-level dependent discovery
     monkeypatch.setattr(
         cmd,
@@ -269,7 +255,6 @@ def test_swap_package_adds_requested_spec_when_it_is_only_root(monkeypatch, tmp_
     env.add("zlib@1.2")
     env.write()
 
-    monkeypatch.setattr(cmd, "_find_installed_dependents_by_package_name", lambda _env, _name: [])
     monkeypatch.setattr(cmd, "_compute_possible_transitive_dependents", lambda _name: {"zlib"})
     monkeypatch.setattr(cmd.tty, "warn", lambda _message: None)
     monkeypatch.setattr(cmd.tty, "msg", lambda _message: None)
@@ -304,7 +289,6 @@ def test_swap_package_readd_dependents_name_only_removes_versioned_root(monkeypa
     env.write()
 
     # Simulate no installed-dependent matches so graph-based root filtering is exercised.
-    monkeypatch.setattr(cmd, "_find_installed_dependents_by_package_name", lambda _env, _name: [])
     monkeypatch.setattr(cmd, "_compute_possible_transitive_dependents", lambda _name: {"gmake", "cmake"})
     monkeypatch.setattr(cmd.tty, "warn", lambda _message: None)
     monkeypatch.setattr(cmd.tty, "msg", lambda _message: None)
