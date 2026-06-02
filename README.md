@@ -81,12 +81,14 @@ source <venv-path>/bin/activate
 ```
 
 
-## Swap package policy and roots: swap-package
+## Modify package spec: swap-package
 The `swap-package` command updates an active environment around one selected package spec.
 
 ```console
 spack swap-package <package-spec> [--concretize] [--dependent-spec <spec> ...] [--uninstall-removed]
 ```
+
+This command is especially useful in container environments where a user may wish to update only one package while using the rest of the stack as it is.
 
 Behavior:
 
@@ -100,8 +102,8 @@ Behavior:
 
 Useful options:
 
-1. `--dependent-spec <spec>` (repeatable): re-add specific dependents with version/variant control instead of by name only, e.g. `--dependent-spec hdf5@1.14.0 --dependent-spec netcdf-c+mpi`.
-2. `--uninstall-removed`: uninstall installed specs that correspond to removed package roots. This is off by default.
+1. `--dependent-spec <spec>` (repeatable): re-add specific dependents with version/variant control instead of by name only (which is the default behavior), e.g. `--dependent-spec hdf5@1.14.0 --dependent-spec netcdf-c+mpi`.
+2. `--uninstall-removed`: uninstall installed specs that correspond to removed package roots. This is off by default, and is not necessary other than to save disk space.
 
 
 ## Environment validation
