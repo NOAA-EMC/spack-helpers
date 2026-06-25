@@ -9,7 +9,10 @@ from typing import Dict, List, Tuple
 
 try:
     import spack.llnl.util.tty as tty
-    from spack.llnl.util.filesystem import working_dir
+    try:
+        from spack.util.filesystem import working_dir
+    except:
+        from spack.llnl.util.filesystem import working_dir
 except ImportError:
     import llnl.util.tty as tty
     from llnl.util.filesystem import working_dir
