@@ -7,6 +7,7 @@ for the same package name in a concretized Spack environment.
 from collections import defaultdict
 from typing import Dict, List, Set
 
+import spack.spec
 try:
     from spack.util import tty
 except ImportError:
