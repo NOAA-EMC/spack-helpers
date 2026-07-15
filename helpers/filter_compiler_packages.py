@@ -7,9 +7,12 @@ configuration based on user-specified compiler specs.
 import spack.spec
 import spack.config
 try:
-    from spack.llnl.util import tty
+    from spack.util import tty
 except ImportError:
-    from llnl.util import tty
+    try:
+        from spack.llnl.util import tty
+    except ImportError:
+        from llnl.util import tty
 
 def _expand_compiler_synonyms(compiler_specs):
     """Expand compiler name synonyms to their full package names.

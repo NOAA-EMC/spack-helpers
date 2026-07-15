@@ -19,12 +19,16 @@ import yaml
 from contextlib import redirect_stdout, redirect_stderr
 from types import SimpleNamespace
 
+using_old_spackstack = False
 try:
-    import spack.llnl.util.tty as tty
-    using_old_spackstack = False
+    import spack.util.tty as tty
 except ImportError:
-    import llnl.util.tty as tty
-    using_old_spackstack = True
+    try:
+        import spack.llnl.util.tty as tty
+    except ImportError:
+        import llnl.util.tty as tty
+        using_old_spackstack = True
+
 import spack.cmd
 import spack.config
 import spack.environment as ev

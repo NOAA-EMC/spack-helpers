@@ -8,14 +8,17 @@ import os
 from typing import Dict, List, Tuple
 
 try:
-    import spack.llnl.util.tty as tty
-    try:
-        from spack.util.filesystem import working_dir
-    except:
-        from spack.llnl.util.filesystem import working_dir
+    from spack.util import tty
 except ImportError:
-    import llnl.util.tty as tty
-    from llnl.util.filesystem import working_dir
+    try:
+        from spack.llnl.util import tty
+    except ImportError:
+        from llnl.util import tty
+
+try:
+    from spack.util.filesystem import working_dir
+except ImportError:
+    from spack.llnl.util.filesystem import working_dir
 
 import spack.spec
 from spack.error import SpackError

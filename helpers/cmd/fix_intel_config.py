@@ -6,9 +6,12 @@ This command performs various fixes for Intel OneAPI externals:
 """
 
 try:
-    import spack.llnl.util.tty as tty
+    from spack.util import tty
 except ImportError:
-    import llnl.util.tty as tty
+    try:
+        from spack.llnl.util import tty
+    except ImportError:
+        from llnl.util import tty
 
 import spack.cmd
 import spack.environment as ev

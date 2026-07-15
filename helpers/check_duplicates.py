@@ -7,11 +7,13 @@ for the same package name in a concretized Spack environment.
 from collections import defaultdict
 from typing import Dict, List, Set
 
-import spack.spec
 try:
-    import spack.llnl.util.tty as tty
+    from spack.util import tty
 except ImportError:
-    import llnl.util.tty as tty
+    try:
+        from spack.llnl.util import tty
+    except ImportError:
+        from llnl.util import tty
 
 
 def _get_build_only_packages(env) -> Set[str]:
