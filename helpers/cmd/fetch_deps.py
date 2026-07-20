@@ -15,7 +15,10 @@ except ImportError:
         from llnl.util import tty
 
 import spack.cmd
-import spack.environment as ev
+try:
+    from spack.environment import active_environment
+except ImportError:
+    from spack.active_environment import active_environment
 from spack.error import SpackError
 from spack.extensions.helpers.fetch_go import fetch_go_dependencies
 from spack.extensions.helpers.fetch_cargo import fetch_cargo_dependencies
@@ -76,7 +79,7 @@ def fetch_deps(parser, args):
         parser.print_help()
         return 1
     
-    env = ev.active_environment()
+    env = active_environment()
     if not env:
         raise SpackError("No active Spack environment.")
 

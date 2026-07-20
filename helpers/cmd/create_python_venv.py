@@ -14,6 +14,10 @@ except ImportError:
         from llnl.util import tty
 
 import spack.environment as ev
+try:
+    from spack.environment import active_environment
+except ImportError:
+    from spack.active_environment import active_environment
 from spack.error import SpackError
 
 description = "create a Python virtual environment from Spack-installed packages"
@@ -115,7 +119,7 @@ def _prompt_multi_choice(prompt, options, formatter):
 
 
 def _select_environment_if_needed():
-    env = ev.active_environment()
+    env = active_environment()
     if env:
         tty.msg(f"Using active environment '{env.name}'.")
         return env

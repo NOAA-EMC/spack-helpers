@@ -14,7 +14,10 @@ except ImportError:
         from llnl.util import tty
 
 import spack.cmd
-import spack.environment as ev
+try:
+    from spack.environment import active_environment
+except ImportError:
+    from spack.active_environment import active_environment
 from spack.error import SpackError
 from spack.extensions.helpers.fix_intel_config import (
     fix_intel_lib_config_for_env,
@@ -47,7 +50,7 @@ def fix_intel_config(parser, args):
         Exit code: 0 for success, 1 for errors
     """
     
-    env = ev.active_environment()
+    env = active_environment()
     if not env:
         raise SpackError("No active Spack environment.")
     

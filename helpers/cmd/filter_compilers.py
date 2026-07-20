@@ -13,7 +13,10 @@ except ImportError:
         from llnl.util import tty
 
 import spack.cmd
-import spack.environment as ev
+try:
+    from spack.environment import active_environment
+except ImportError:
+    from spack.active_environment import active_environment
 from spack.error import SpackError
 from spack.extensions.helpers.filter_compiler_packages import filter_compiler_packages
 
@@ -59,7 +62,7 @@ def filter_compilers(parser, args):
         Exit code: 0 for success, 1 for errors
     """
     
-    env = ev.active_environment()
+    env = active_environment()
     if not env:
         raise SpackError("No active Spack environment.")
     

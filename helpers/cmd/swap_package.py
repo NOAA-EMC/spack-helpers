@@ -18,6 +18,10 @@ import spack.cmd.dependents as dependents_cmd
 import spack.cmd.uninstall as uninstall_cmd
 import spack.config
 import spack.environment as ev
+try:
+    from spack.environment import active_environment
+except ImportError:
+    from spack.active_environment import active_environment
 import spack.spec
 import spack.store
 from spack.enums import InstallRecordStatus
@@ -164,7 +168,7 @@ def _find_installed_dependents_by_package_name(env, package_name):
 
 def swap_package(parser, args):
     """Handle swap-package command."""
-    env = ev.active_environment()
+    env = active_environment()
     if not env:
         raise SpackError("No active Spack environment.")
 

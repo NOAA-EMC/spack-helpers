@@ -15,7 +15,10 @@ except ImportError:
         from llnl.util import tty
 
 import spack.cmd
-import spack.environment as ev
+try:
+    from spack.environment import active_environment
+except ImportError:
+    from spack.active_environment import active_environment
 from spack.error import SpackError
 from spack.extensions.helpers.check_duplicates import check_duplicate_packages
 from spack.extensions.helpers.check_compiler_usage import check_compiler_usage
@@ -141,7 +144,7 @@ def validate(parser, args):
         parser.print_help()
         return 1
     
-    env = ev.active_environment()
+    env = active_environment()
     if not env:
         raise SpackError("No active Spack environment.")
     
