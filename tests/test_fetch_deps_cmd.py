@@ -69,7 +69,7 @@ def test_dep_with_go_not_a_root_is_included(monkeypatch):
         roots=[root_no_go],   # go-client is a dependency, not a root
     )
 
-    monkeypatch.setattr(cmd.ev, "active_environment", lambda: env)
+    monkeypatch.setattr(cmd, "active_environment", lambda: env)
 
     called_with = {}
     monkeypatch.setattr(
@@ -101,7 +101,7 @@ def test_user_specified_dep_spec_is_matched(monkeypatch):
         roots=[root],   # go-client is a dependency, not a root
     )
 
-    monkeypatch.setattr(cmd.ev, "active_environment", lambda: env)
+    monkeypatch.setattr(cmd, "active_environment", lambda: env)
 
     called_with = {}
     monkeypatch.setattr(
@@ -132,7 +132,7 @@ def test_non_concrete_specs_are_excluded(monkeypatch):
 
     env = _FakeEnv(all_specs=[concrete, abstract])
 
-    monkeypatch.setattr(cmd.ev, "active_environment", lambda: env)
+    monkeypatch.setattr(cmd, "active_environment", lambda: env)
 
     called_with = {}
     monkeypatch.setattr(
@@ -153,7 +153,7 @@ def test_warns_for_truly_missing_spec(monkeypatch):
 
     env = _FakeEnv(all_specs=[root])
 
-    monkeypatch.setattr(cmd.ev, "active_environment", lambda: env)
+    monkeypatch.setattr(cmd, "active_environment", lambda: env)
     monkeypatch.setattr(cmd, "fetch_go_dependencies", lambda specs, **_kw: None)
 
     warns = []

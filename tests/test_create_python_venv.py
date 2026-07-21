@@ -27,7 +27,7 @@ def spack_test_env(tmp_path):
 
 def _setup_inactive_environment_mocks(monkeypatch, env_names=None, user_input=None):
     """Helper to mock inactive environment selection (reduces duplication)."""
-    monkeypatch.setattr(ev, "active_environment", lambda: None)
+    monkeypatch.setattr(cmd, "active_environment", lambda: None)
     monkeypatch.setattr(ev, "all_environment_names", lambda: env_names or [])
     monkeypatch.setattr("builtins.input", lambda _prompt: user_input)
     
