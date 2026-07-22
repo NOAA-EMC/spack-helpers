@@ -42,7 +42,7 @@ def fix_intel_lib_config_for_env(env):
     LIB_PATH_SUFFIX = 'compiler/lib/intel64_lin'
     
     # Get all packages configuration (from all scopes to find externals)
-    all_packages = spack.config.get('packages')
+    all_packages = spack.config.CONFIG.get('packages')
     
     if not all_packages:
         tty.debug("No packages configuration found")
@@ -162,7 +162,7 @@ def consolidate_intel_oneapi_compilers(env):
     PACKAGE_NAME = 'intel-oneapi-compilers'
     
     # Get all packages configuration
-    all_packages = spack.config.get('packages')
+    all_packages = spack.config.CONFIG.get('packages')
     
     if not all_packages:
         tty.debug("No packages configuration found")

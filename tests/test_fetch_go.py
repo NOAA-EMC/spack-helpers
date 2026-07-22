@@ -70,7 +70,7 @@ def test_fetch_go_dependencies_with_external_go(tmp_path):
         }
     }
     
-    with spack.config.override("packages", externals_config):
+    with spack.config.CONFIG.override("packages", externals_config):
         # Add gh spec to environment
         gh_spec = spack.spec.Spec("gh")
         env.add(gh_spec)

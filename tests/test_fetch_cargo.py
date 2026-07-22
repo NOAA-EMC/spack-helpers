@@ -80,7 +80,7 @@ def test_fetch_cargo_dependencies_with_external_rust(tmp_path):
         }
     }
     
-    with spack.config.override("packages", externals_config):
+    with spack.config.CONFIG.override("packages", externals_config):
         # Add py-maturin spec to environment
         maturin_spec = spack.spec.Spec("py-maturin@1.9.6")
         env.add(maturin_spec)
@@ -157,7 +157,7 @@ def test_fetch_cargo_dependencies_with_spack_rust(tmp_path):
         }
     }
     
-    with spack.config.override("packages", externals_config):
+    with spack.config.CONFIG.override("packages", externals_config):
         # Add py-maturin spec to environment (rust will be a dependency)
         maturin_spec = spack.spec.Spec("py-maturin")
         env.add(maturin_spec)

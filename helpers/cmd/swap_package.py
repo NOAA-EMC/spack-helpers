@@ -238,7 +238,7 @@ def swap_package(parser, args):
 
         if args.concretize:
             tty.msg("Running fresh concretization...")
-            with spack.config.override("concretizer:reuse", False):
+            with spack.config.CONFIG.override("concretizer:reuse", False):
                 concretized_specs = env.concretize()
                 if concretized_specs:
                     env.write()

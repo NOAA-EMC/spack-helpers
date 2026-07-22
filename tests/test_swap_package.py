@@ -82,7 +82,7 @@ def test_swap_package_command_flow(monkeypatch, swap_package_env):
 
     monkeypatch.setattr(swap_package_env, "concretize", _fake_concretize)
     monkeypatch.setattr(
-        cmd.spack.config,
+        cmd.spack.config.CONFIG,
         "override",
         lambda key, value: (override_calls.append((key, value)) or _OverrideCtx()),
     )

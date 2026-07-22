@@ -42,14 +42,14 @@ def multi_compiler_env(tmp_path, monkeypatch):
     env.manifest.configuration['packages'] = packages_config
     env.write()
     
-    original_config_get = spack.config.get
+    original_config_get = spack.config.CONFIG.get
     
     def mock_config_get(key, default=None, scope=None):
         if key == 'packages':
             return env.manifest.configuration.get('packages', {})
         return original_config_get(key, default, scope)
     
-    monkeypatch.setattr(spack.config, 'get', mock_config_get)
+    monkeypatch.setattr(spack.config.CONFIG, 'get', mock_config_get)
     
     return env
 
@@ -73,14 +73,14 @@ def single_external_env(tmp_path, monkeypatch):
     env.manifest.configuration['packages'] = packages_config
     env.write()
     
-    original_config_get = spack.config.get
+    original_config_get = spack.config.CONFIG.get
     
     def mock_config_get(key, default=None, scope=None):
         if key == 'packages':
             return env.manifest.configuration.get('packages', {})
         return original_config_get(key, default, scope)
     
-    monkeypatch.setattr(spack.config, 'get', mock_config_get)
+    monkeypatch.setattr(spack.config.CONFIG, 'get', mock_config_get)
     
     return env
 
@@ -94,14 +94,14 @@ def empty_packages_env(tmp_path, monkeypatch):
     env = ev.create_in_dir(env_path, with_view=False)
     env.write()
     
-    original_config_get = spack.config.get
+    original_config_get = spack.config.CONFIG.get
     
     def mock_config_get(key, default=None, scope=None):
         if key == 'packages':
             return env.manifest.configuration.get('packages', {})
         return original_config_get(key, default, scope)
     
-    monkeypatch.setattr(spack.config, 'get', mock_config_get)
+    monkeypatch.setattr(spack.config.CONFIG, 'get', mock_config_get)
     
     return env
 

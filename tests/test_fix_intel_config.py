@@ -14,20 +14,20 @@ from spack.extensions.helpers.fix_intel_config import (
 
 
 def _setup_mock_config(monkeypatch, env):
-    """Helper to set up mock for spack.config.get to return environment packages.
+    """Helper to set up mock for spack.config.CONFIG.get to return environment packages.
     
     Args:
         monkeypatch: pytest monkeypatch fixture
         env: Spack environment to use for config
     """
-    original_config_get = spack.config.get
+    original_config_get = spack.config.CONFIG.get
     
     def mock_config_get(key, default=None, scope=None):
         if key == 'packages':
             return env.manifest.configuration.get('packages', {})
         return original_config_get(key, default, scope)
     
-    monkeypatch.setattr(spack.config, 'get', mock_config_get)
+    monkeypatch.setattr(spack.config.CONFIG, 'get', mock_config_get)
 
 
 @pytest.fixture

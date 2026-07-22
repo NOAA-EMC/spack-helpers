@@ -421,7 +421,7 @@ def deploy(parser, args):
         tty.msg(f"... concretizing ...")
         with redirect_stdout(logfile), redirect_stderr(logfile):
             with env.write_transaction():
-                with spack.config.override("concretizer:reuse", False):
+                with spack.config.CONFIG.override("concretizer:reuse", False):
                     concretized_specs = env.concretize()
                 env.write()
             ev.display_specs([concrete for _, concrete in concretized_specs])

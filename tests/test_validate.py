@@ -60,7 +60,7 @@ def _validation_env_base(tmp_path_factory):
     env.write()
     
     # Concretize the environment once
-    with spack.config.override("concretizer:unify", "when_possible"):
+    with spack.config.CONFIG.override("concretizer:unify", "when_possible"):
         env.concretize()
     env.write()
     

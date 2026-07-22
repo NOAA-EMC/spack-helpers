@@ -84,7 +84,7 @@ def filter_compiler_packages(env, compiler_specs, mode='remove'):
     tty.debug(f"filter_compiler_packages: mode={mode}, parsed_specs={[str(s) for s in parsed_specs]}")
     
     # Get all packages configuration (from all scopes to find externals)
-    all_packages = spack.config.get('packages')
+    all_packages = spack.config.CONFIG.get('packages')
     
     if not all_packages:
         return 0
