@@ -577,8 +577,10 @@ def deploy(parser, args):
         )
 
         # Meta modules
-        tty.msg(f"... writing metamodules ...")
-        setup_meta_modules()
+        if "write_metamodules" in deployment:
+            if deployment["write_metamodules"]:
+                tty.msg(f"... writing metamodules ...")
+                setup_meta_modules()
 
         # Close this deployment's logfile and zero out spack.environment's stored config info
         ev.deactivate()
