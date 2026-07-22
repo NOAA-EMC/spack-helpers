@@ -32,6 +32,8 @@ except ImportError:
 import spack.cmd
 import spack.config
 import spack.environment as ev
+import spack.spec
+import spack.store
 from spack.error import SpackError
 from spack.extensions.helpers.check_duplicates import check_duplicate_packages
 from spack.extensions.helpers.check_compiler_usage import check_compiler_usage
@@ -166,6 +168,47 @@ def get_create_env_settings(env_dir_basename, deployment, deployments, spack_sta
 
     return config_dict
 
+
+def _configure_roots_as_externals(deployment, deployments, spack_stack_dir, env):
+    """Configure externals based on the root packages of another deployment."""
+
+    source_deployment_str = deployment["roots_as_externals_from"]
+    try:
+        source_template, source_compiler = source_deployment_str.split('%')
+    except ValueError:
+        raise SpackError(f"Invalid format for 'roots_as_externals_from': {source_deployment_str}. Expected 'template%compiler'.")
+
+    # Find the source deployment
+    source_deployment_config = None
+    for _deployment in deployments.values():
+        if _deployment["template"] == source_template and _deployment["compiler"] == source_compiler:
+            source_deployment_config = _deployment
+            break
+
+    if not source_deployment_config:
+        raise SpackError(f"Could not find source deployment '{source_deployment_str}' in deployments.yaml")
+
+    source_env_basename = get_env_dir_basename(source_deployment_config)
+    source_env_path = os.path.join(spack_stack_dir, "envs", source_env_basename)
+
+    if not os.path.isdir(source_env_path):
+        raise SpackError(f"Source deployment environment directory not found at: {source_env_path}")
+
+    source_env = ev.Environment(source_env_path)
+
+    import spack.detection
+
+    with source_env:
+        packages = [spec.name for spec in source_env.concrete_roots()]
+        paths = [spec.prefix for spec in source_env.concrete_roots()]
+        detected_packages = spack.detection.by_path(
+            packages, path_hints=paths,
+        )
+    with env.write_transaction():
+        if detected_packages:
+            new_specs = spack.detection.update_configuration(
+                detected_packages, buildable=False,
+            )
 
 def run_batch_install(batch_config, deployment, env_dir_full_path, logfile, logfilepath, packages_to_install=[], suffix=".batch_install"):
     """Run installation via batch scheduler."""
@@ -362,6 +405,11 @@ def deploy(parser, args):
             tty.msg("... configuring buildability for approved packages ...")
             approved_packages = read_approved_packages_from_file(approved_list_path)
             configured_count = allow_only_approved_packages(env, approved_packages)
+
+        # Configure externals from another deployment's roots
+        if "roots_as_externals_from" in deployment:
+            tty.msg(f"... configuring externals from {deployment['roots_as_externals_from']} ...")
+            _configure_roots_as_externals(deployment, deployments, spack_stack_dir, env)
 
         if args.until == "create":
             ev.deactivate()
