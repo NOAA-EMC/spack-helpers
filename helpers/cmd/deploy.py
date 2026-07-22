@@ -304,6 +304,17 @@ def deploy(parser, args):
         stack_env.write()
         stack_env.check_umask()
         env = ev.Environment(env_dir_full_path)
+
+        # Exclude include's if specified
+        if "exclude_includes" in deployment:
+            if "include" in env.manifest["spack"]:
+                includes = env.manifest["spack"]["include"]
+                new_includes = [inc for inc in includes if inc not in deployment["exclude_includes"]]
+                if len(new_includes) < len(includes):
+                    tty.msg(f"... excluding includes: {' ; '.join(deployment['exclude_includes'])} ...")
+                    env.manifest["spack"]["include"] = new_includes
+                    env.manifest.changed = True
+                    env.write()
         ev.activate(env)
 
         # Filter out unwanted packages before concretization
