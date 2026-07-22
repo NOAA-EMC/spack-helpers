@@ -358,6 +358,7 @@ def deploy(parser, args):
                     env.manifest["spack"]["include"] = new_includes
                     env.manifest.changed = True
                     env.write()
+
         ev.activate(env)
 
         # Filter out unwanted packages before concretization
