@@ -506,7 +506,7 @@ def deploy(parser, args):
             tty.msg("... installing ...")
         
         if args.no_scheduler:
-            specs = env.all_matching_specs(*(" ".join(deployment["packages_to_install"])))
+            specs = env.all_matching_specs(*(" ".join(deployment["packages_to_install"]))) or env.all_specs()
             env.install_specs(specs)
         else:
             logfile.write("Starting install jobs via job scheduler...\n")
