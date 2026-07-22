@@ -453,7 +453,7 @@ def deploy(parser, args):
             raise SpackError("Disallowed compilers found! Review the errors above.")
 
         # Check for packages that shouldn't be built with GCC
-        if "allowed_gcc_packages" in deployment:
+        if ("allowed_gcc_packages" in deployment) and (allowed_compiler_spec.split("@")[0] != "gcc"):
             illegal_gcc_specs = check_compiler_usage(
                 env, "gcc", deployment["allowed_gcc_packages"]
             )
