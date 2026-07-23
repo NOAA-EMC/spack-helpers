@@ -103,7 +103,7 @@ def get_site_and_tier(deployment={}, args=None):
     """Determine the site and tier for deployment."""
     fqdn = socket.getfqdn()
     if "andor" in fqdn:
-        return "nimbus-test", "tier2"
+        return "nimbus-early-testing", "tier2"
     if args and args.site:
         return args.site, "tier1"
     if "site" in deployment:
@@ -421,7 +421,11 @@ def deploy(parser, args):
         tty.msg(f"... concretizing ...")
         with redirect_stdout(logfile), redirect_stderr(logfile):
             with env.write_transaction():
-                with spack.config.CONFIG.override("concretizer:reuse", False):
+                if hasattr(spack.config, "override"):
+                    override_fn = spack.config.override
+                else:
+                    override_fn = spack.config.CONFIG.override
+                with override_fn("concretizer:reuse", False):
                     concretized_specs = env.concretize()
                 env.write()
             ev.display_specs([concrete for _, concrete in concretized_specs])
