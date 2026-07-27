@@ -101,8 +101,8 @@ def setup_parser(subparser):
 
 def get_site_and_tier(deployment={}, args=None):
     """Determine the site and tier for deployment."""
-    if os.getenv["SPACK_STACK_SITE"]:
-        hostname = os.getenv["SPACK_STACK_SITE"]
+    if os.getenv("SPACK_STACK_SITE"):
+        hostname = os.getenv("SPACK_STACK_SITE")
     else:
         hostname = socket.getfqdn()
     if args and args.site:
