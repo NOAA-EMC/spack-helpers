@@ -101,14 +101,14 @@ def setup_parser(subparser):
 
 def get_site_and_tier(deployment={}, args=None):
     """Determine the site and tier for deployment."""
+    hostname = os.getenv("SPACK_STACK_SITE") or socket.getfqdn()
+    tier = os.getenv("SPACK_STACK_TIER") or ""
     if args and args.site:
         return args.site, tier or "tier1"
     if "site" in deployment:
         return deployment["site"], "tier1"
     if "acorn.wcoss2" in hostname:
         return "acorn", "tier1"
-    hostname = os.getenv("SPACK_STACK_SITE") or socket.getfqdn()
-    tier = os.getenv("SPACK_STACK_TIER") or ""
     return hostname, tier
 
 
