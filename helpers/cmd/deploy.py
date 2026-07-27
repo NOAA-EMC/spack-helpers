@@ -173,7 +173,7 @@ def _configure_roots_as_externals(deployment, deployments, spack_stack_dir, env)
     """Configure externals based on the root packages of another deployment."""
 
     source_deployment_str = deployment["roots_as_externals_from"]["env"]
-    package_names_to_include = deployment["roots_as_externals_from"]["package_names"]
+    include_specs = deployment["roots_as_externals_from"]["specs"]
     try:
         source_template, source_compiler = source_deployment_str.split('%')
     except ValueError:
@@ -204,7 +204,7 @@ def _configure_roots_as_externals(deployment, deployments, spack_stack_dir, env)
         ext_specs = source_env.concrete_roots()
         externals_by_name = collections.defaultdict(list)
         for root in ext_specs:
-            if root.name not in package_names_to_include: continue
+            if not any([root.satisfies(x) for x in include_specs]): continue
             filtered = root.copy(deps=False)
             for variant_to_ignore in ("patches", "build_system", "target", "arch", "os", "build_type"):
                 if variant_to_ignore in filtered.variants:
