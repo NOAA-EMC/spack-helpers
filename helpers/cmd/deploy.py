@@ -133,15 +133,14 @@ def is_deployment_requested(env_dir_basename, deployment, args, spack_stack_dir)
     """Determine if a deployment should be processed."""
     template = deployment["template"]
     template_and_compiler = deployment["template"] + "%" + deployment["compiler"]
-    if args.deployments and (template not in args.deployments) and (template_and_compiler not in args.deployments):
+    tc_spec = spack.spec.Spec(template_and_compiler)
+    if any([tc_spec.satisfies(x) for x in args.deployments]) or (not args.deployments):
+        if args.redeploy_existing:
+            return True
+        else:
+            return not deployment_already_exists(env_dir_basename, spack_stack_dir)
+    else:
         return False
-    if template in args.deployments:
-        return True
-    if template_and_compiler in args.deployments:
-        return True
-    if args.redeploy_existing:
-        return True
-    return not deployment_already_exists(env_dir_basename, spack_stack_dir)
 
 
 def get_create_env_settings(env_dir_basename, deployment, deployments, spack_stack_dir):
