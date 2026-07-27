@@ -178,7 +178,6 @@ def _configure_roots_as_externals(deployment, deployments, spack_stack_dir, env)
     except ValueError:
         raise SpackError(f"Invalid format for 'roots_as_externals_from': {source_deployment_str}. Expected 'template%compiler'.")
 
-    # Find the source deployment
     source_deployment_config = None
     for _deployment in deployments.values():
         if _deployment["template"] == source_template and _deployment["compiler"] == source_compiler:
@@ -196,19 +195,33 @@ def _configure_roots_as_externals(deployment, deployments, spack_stack_dir, env)
 
     source_env = ev.Environment(source_env_path)
 
-    import spack.detection
+    import collections
+    from spack.detection.common import _pkg_config_dict
+    import spack.schema
 
     with source_env:
-        packages = [spec.name for spec in source_env.concrete_roots()]
-        paths = [spec.prefix for spec in source_env.concrete_roots()]
-        detected_packages = spack.detection.by_path(
-            packages, path_hints=paths,
-        )
+        ext_specs = source_env.concrete_roots()
+        externals_by_name = collections.defaultdict(list)
+        for root in ext_specs:
+            filtered = root.copy(deps=False)
+            for variant_to_ignore in ("patches", "build_system", "target", "arch", "os", "build_type"):
+                if variant_to_ignore in filtered.variants:
+                    del filtered.variants[variant_to_ignore]
+            ext = spack.spec.Spec(filtered.format("{name}@{version} {variants}"))
+            ext.external_path = root.prefix
+            externals_by_name[root.name].append(ext)
+
+    pkg_to_cfg = {}
+    for name, entries in externals_by_name.items():
+        cfg = _pkg_config_dict(entries)
+        cfg["buildable"] = False
+        pkg_to_cfg[name] = cfg
+
     with env.write_transaction():
-        if detected_packages:
-            new_specs = spack.detection.update_configuration(
-                detected_packages, buildable=False,
-            )
+        scope = env.scope_name
+        existing = spack.config.get("packages", scope=scope) or {}
+        merged = spack.schema.merge_yaml(existing, pkg_to_cfg)
+        spack.config.set("packages", merged, scope=scope)
 
 def run_batch_install(batch_config, deployment, env_dir_full_path, logfile, logfilepath, packages_to_install=[], suffix=".batch_install"):
     """Run installation via batch scheduler."""
