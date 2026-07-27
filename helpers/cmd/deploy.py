@@ -101,18 +101,15 @@ def setup_parser(subparser):
 
 def get_site_and_tier(deployment={}, args=None):
     """Determine the site and tier for deployment."""
-    if os.getenv("SPACK_STACK_SITE"):
-        hostname = os.getenv("SPACK_STACK_SITE")
-    else:
-        hostname = socket.getfqdn()
     if args and args.site:
-        return args.site, "tier1"
+        return args.site, tier or "tier1"
     if "site" in deployment:
         return deployment["site"], "tier1"
     if "acorn.wcoss2" in hostname:
         return "acorn", "tier1"
-    # Default fallback
-    return "default", "tier1"
+    hostname = os.getenv("SPACK_STACK_SITE") or socket.getfqdn()
+    tier = os.getenv("SPACK_STACK_TIER") or ""
+    return hostname, tier
 
 
 def get_env_dir_basename(deployment):
