@@ -37,7 +37,7 @@ def check_compiler_usage(env, restricted_compiler_name, allowed_packages):
     allowed_set = set(allowed_packages)
     
     # Iterate over all concretized specs in the environment
-    for user_spec, concrete_spec in env.concretized_specs():
+    for user_spec, concrete_spec in env.all_specs():
         pkg_name = concrete_spec.name
 
         if pkg_name in allowed_set:
