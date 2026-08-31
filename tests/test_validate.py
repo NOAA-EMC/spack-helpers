@@ -172,7 +172,7 @@ def test_check_compiler_usage_no_violations(validation_test_env):
     
     # Get all package names in the environment
     all_packages = set()
-    for _, concrete_spec in env.concretized_specs():
+    for concrete_spec in env.all_specs():
         all_packages.add(concrete_spec.name)
     
     # Allow all packages to use gcc
