@@ -40,7 +40,7 @@ def read_approved_packages_from_file(filepath):
         raise SpackError(f"Could not read package list from {filepath}: {e}")
 
 
-def check_approved_packages(env, approved_packages):
+def check_approved_packages(env, approved_packages, only_roots=False):
     """Check for specs with package names not in the approved list.
     
     Iterates over all specs in the environment (including dependencies) and
@@ -50,6 +50,7 @@ def check_approved_packages(env, approved_packages):
     Args:
         env: A Spack Environment object to check
         approved_packages: List of approved package names (e.g., ['gcc', 'openmpi', 'hdf5'])
+        only_roots: Only check env roots (default is check all specs)
         
     Returns:
         List[Spec]: List of Spec objects for unauthorized packages.
@@ -58,20 +59,29 @@ def check_approved_packages(env, approved_packages):
     
     # Convert approved_packages to a set for faster lookup
     approved_set = set(approved_packages)
-    
+
+    if only_roots:
+       specs = env.roots()
+    else:
+       specs = env.all_specs()
+
     # Iterate over all specs in the environment (including dependencies)
-    for concrete_spec in env.all_specs():
+    for spec in specs:
         # Skip external packages
-        if concrete_spec.external:
-            tty.debug(f"Skipping external package: {concrete_spec.name}")
+        if spec.external:
+            tty.debug(f"Skipping external package: {spec.name}")
             continue
         
-        pkg_name = concrete_spec.name
+        pkg_name = spec.name
         
         # If this package is not approved, mark as unauthorized
         if pkg_name not in approved_set:
-            unauthorized_specs.append(concrete_spec)
-            tty.debug(f"Illegal package: {pkg_name}")
+            unauthorized_specs.append(spec)
+            if only_roots:
+                concrete_msg = ["non-concrete", "concrete"][spec.concrete]
+            else:
+                concrete_msg = ["concrete"]
+            tty.debug(f"Illegal {concrete_msg} package: {pkg_name} ({spec.__str__()})")
         else:
             tty.debug(f"Legal package validated: {pkg_name}")
     

@@ -109,6 +109,11 @@ def setup_parser(subparser):
         'check-approved-pkgs',
         help='ensure only approved packages appear in environment'
     )
+    approved_parser.add_argument(
+        '--only-roots',
+        action='store_true',
+        help='check only root specs (concrete & non-concrete); default is all concrete specs'
+    )
     
     # Make packages and --pkgs-from-file mutually exclusive
     pkg_group = approved_parser.add_mutually_exclusive_group(required=True)
@@ -227,7 +232,8 @@ def validate(parser, args):
         
         unauthorized_specs = check_approved_packages(
             env, 
-            approved_packages=approved_packages
+            approved_packages=approved_packages,
+            only_roots=args.only_roots,
         )
         
         if unauthorized_specs:
